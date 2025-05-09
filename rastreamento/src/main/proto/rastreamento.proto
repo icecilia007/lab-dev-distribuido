@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.logistica.rastreamento.grpc";
+option java_outer_classname = "RastreamentoProto";
+
+package rastreamento;
+
+service RastreamentoService {
+  // Endpoint para motoristas enviarem atualizações de localização
+  rpc AtualizarLocalizacao(AtualizacaoLocalizacaoRequest) returns (AtualizacaoLocalizacaoResponse) {}
+
+  // Endpoint para clientes consultarem localização atual
+  rpc ConsultarLocalizacao(ConsultaLocalizacaoRequest) returns (LocalizacaoResponse) {}
+
+  // Endpoint para streaming de atualizações de localização
+  rpc MonitorarLocalizacao(ConsultaLocalizacaoRequest) returns (stream LocalizacaoResponse) {}
+
+  // Endpoint para buscar entregas próximas a uma coordenada
+  rpc BuscarEntregasProximas(BuscarProximasRequest) returns (EntregasProximasResponse) {}
+}
+
+message AtualizacaoLocalizacaoRequest {
+  int64 motorista_id = 1;
+  int64 pedido_id = 2;
+  double latitude = 3;
+  double longitude = 4;
+  int64 timestamp = 5;
+  string status_veiculo = 6; // em_movimento, parado, em_entrega
+}
+
+message AtualizacaoLocalizacaoResponse {
+  bool sucesso = 1;
+  string mensagem = 2;
+}
+
+message ConsultaLocalizacaoRequest {
+  int64 pedido_id = 1;
+}
+
+message LocalizacaoResponse {
+  int64 pedido_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  int64 timestamp = 4;
+  string status_entrega = 5;
+  double distancia_destino_km = 6;
+  int32 tempo_estimado_minutos = 7;
+}
+
+message BuscarProximasRequest {
+  double latitude = 1;
+  double longitude = 2;
+  double raio_km = 3;
+}
+
+message EntregaProxima {
+  int64 pedido_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double distancia_km = 4;
+}
+
+message EntregasProximasResponse {
+  repeated EntregaProxima entregas = 1;
+}

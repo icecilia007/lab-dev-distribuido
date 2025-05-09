@@ -1,0 +1,42 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/main_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+rabbitmq:
+#  queue: pedidosQueue
+#  exchange: pedidosExchange
+#  routingkey: pedidosRoutingKey
+  exchange: logistica.exchange
+
+# Configurações do gRPC
+grpc:
+  server:
+    port: 9090
+
+# Configurações para outros serviços
+services:
+  pedido:
+    url: "http://localhost:8081"
+  usuario:
+    url: "http://localhost:8080"
+
+logging:
+  level:
+    com.logistica.pedidos: DEBUG
+    org.springframework.amqp: INFO
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
