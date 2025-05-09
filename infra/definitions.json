@@ -1,0 +1,85 @@
+//{
+//  "rabbit_version": "3.9",
+//  "users": [
+//    {
+//      "name": "guest",
+//      "password_hash": "BMfxN8drrYcIqXZMr+pWTpDT0nMcOagMduLX0bjr4jwud/pN",
+//      "hashing_algorithm": "rabbit_password_hashing_sha256",
+//      "tags": "administrator"
+//    }
+//  ],
+//  "vhosts": [
+//    {
+//      "name": "/"
+//    }
+//  ],
+//  "permissions": [
+//    {
+//      "user": "guest",
+//      "vhost": "/",
+//      "configure": ".*",
+//      "write": ".*",
+//      "read": ".*"
+//    }
+//  ],
+//  "exchanges": [
+//    {
+//      "name": "pedidosExchange",
+//      "vhost": "/",
+//      "type": "topic",
+//      "durable": true,
+//      "auto_delete": false,
+//      "internal": false,
+//      "arguments": {}
+//    }
+//  ],
+//  "queues": [
+//    {
+//      "name": "pedidosQueue",
+//      "vhost": "/",
+//      "durable": true,
+//      "auto_delete": false,
+//      "arguments": {}
+//    },
+//    {
+//      "name": "rastreamentoQueue",
+//      "vhost": "/",
+//      "durable": true,
+//      "auto_delete": false,
+//      "arguments": {}
+//    },
+//    {
+//      "name": "notificacoesQueue",
+//      "vhost": "/",
+//      "durable": true,
+//      "auto_delete": false,
+//      "arguments": {}
+//    }
+//  ],
+//  "bindings": [
+//    {
+//      "source": "pedidosExchange",
+//      "vhost": "/",
+//      "destination": "pedidosQueue",
+//      "destination_type": "queue",
+//      "routing_key": "pedidos.#",
+//      "arguments": {}
+//    },
+//    {
+//      "source": "pedidosExchange",
+//      "vhost": "/",
+//      "destination": "rastreamentoQueue",
+//      "destination_type": "queue",
+//      "routing_key": "pedidos.#",
+//      "arguments": {}
+//    },
+//    {
+//      "source": "pedidosExchange",
+//      "vhost": "/",
+//      "destination": "notificacoesQueue",
+//      "destination_type": "queue",
+//      "routing_key": "#",
+//      "arguments": {}
+//    }
+//  ]
+//}
