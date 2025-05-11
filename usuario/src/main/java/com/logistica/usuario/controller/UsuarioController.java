@@ -19,7 +19,6 @@ import java.util.List;
 public class UsuarioController {
     private final UsuarioService usuarioService;
 
-    // Injeção de dependência via construtor
     public UsuarioController(UsuarioService usuarioService) {
         this.usuarioService = usuarioService;
     }
@@ -31,7 +30,6 @@ public class UsuarioController {
         return usuarioResponse.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.status(401).build());
     }
-
     // Endpoints para Cliente
     @PostMapping("/clientes")
     public ResponseEntity<Cliente> criarCliente(@RequestBody Cliente cliente) {
