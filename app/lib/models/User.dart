@@ -2,7 +2,7 @@ class User {
   final int id;
   final String name;
   final String email;
-  final String type; // 'cliente', 'motorista', 'operador'
+  final String type;
 
   User({
     required this.id,
