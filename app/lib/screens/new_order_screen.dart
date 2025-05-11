@@ -1,4 +1,3 @@
-// lib/screens/new_order_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -24,7 +23,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mercadoriaController = TextEditingController();
 
-  // Coordenadas de origem e destino
   LatLng _origem = const LatLng(0, 0);
   LatLng _destino = const LatLng(0, 0);
 
@@ -33,7 +31,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   bool _destinoSelecionado = false;
   bool _useCurrentLocationAsOrigin = false;
 
-  // Controlador para o mapa
   final MapController _mapController = MapController();
   List<Marker> _markers = [];
 
@@ -53,7 +50,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Verificar se os serviços de localização estão habilitados
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (context.mounted) {
@@ -67,7 +63,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       return;
     }
 
-    // Verificar permissão de localização
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();

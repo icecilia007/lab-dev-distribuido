@@ -1,0 +1,90 @@
+server:
+  port: 8000
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - url: /v3/api-docs
+        name: API Gateway
+
+# Configurações dos serviços
+services:
+  auth:
+    url: http://localhost:8000
+  usuario:
+    url: http://localhost:8080
+  pedido:
+    url: http://localhost:8081
+  rastreamento:
+    url: http://localhost:8082
+  notificacao:
+    url: http://localhost:8083
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # Rotas para os microsserviços
+      routes:
+        - id: swagger-ui-route
+          uri: http://localhost:${server.port}
+          predicates:
+            - Path=/swagger-ui/**,/v3/api-docs/**,/swagger-resources/**,/webjars/**
+        # Serviço de Auth
+        - id: auth-service
+          uri: http://localhost:8000
+          predicates:
+            - Path=/api/auth/**
+        # Serviço de Usuários
+        - id: usuario-service
+          uri: http://localhost:8080
+          predicates:
+            - Path=/api/usuarios/**
+
+        # Serviço de Pedidos
+        - id: pedido-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/pedidos/**
+
+        # Serviço de Rastreamento
+        - id: rastreamento-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/rastreamento/**
+
+        # Serviço de Notificações
+        - id: notificacao-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/notificacoes/**
+
+      # Configurações globais
+      default-filters:
+        - name: RequestSize
+          args:
+            maxSize: 5MB
+
+# Configuração de segurança
+security:
+  jwt:
+    secret: a36cac71d1a44a1593a22d98403455bd2d6f737e465c4cf3fcead29381a08335
+    expiration: 86400
+  internal:
+    header-name: X-Internal-Auth
+    header-value: 2BE2AB6217329B86A427A3819B626
+
+# Configuração de logging
+logging:
+  level:
+    org.springframework.security: TRACE
+    org.springframework.web.reactive.function.client: DEBUG
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: INFO
+    com.logistica.apigateway: DEBUG

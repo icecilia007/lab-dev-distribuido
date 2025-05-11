@@ -1,4 +1,3 @@
-// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
@@ -40,13 +39,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      if (index == 0) {
+        _loadPedidosAtivos();
+      }
     });
   }
 
   Future<void> _logout() async {
     await widget.authService.logout();
     if (context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/login');
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
@@ -212,7 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           } else {
-            // Filtrar apenas pedidos ativos
             final activeOrders = snapshot.data!.where((order) =>
             order.status != 'ENTREGUE' &&
                 order.status != 'CANCELADO').toList();

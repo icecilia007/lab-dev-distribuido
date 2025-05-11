@@ -96,7 +96,7 @@ Os casos de teste a seguir cobrem o fluxo completo do sistema logístico, inclui
    ```http
    POST /api/rastreamento/pedido/{pedidoId}/coleta?motoristaId={motoristaId}
    ```
-    - Verificar: resposta 200 OK com true e pedido com status "EM_ROTA"
+    - Verificar: resposta 200 OK com true e consultar o respectivo id do pedido com status "EM_ROTA"
 
 9. **Simular motorista se deslocando até o destino (enviar 3 atualizações de localização):**
    ```http
