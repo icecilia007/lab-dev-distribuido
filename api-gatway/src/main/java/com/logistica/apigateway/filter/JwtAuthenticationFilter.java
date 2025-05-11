@@ -96,11 +96,24 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private boolean isPublicPath(String path) {
         if (publicPaths == null) return false;
 
-        for(String publicPath : publicPaths) {
-            if (path.contains(publicPath)) return true;
-        }
-        if (path.endsWith("/swagger-ui/index.html")) {
-            return true;
+        for (String publicPath : publicPaths) {
+            // Verificar correspondência exata
+            if (path.equals(publicPath)) {
+                return true;
+            }
+
+            // Verificar padrões com curinga
+            if (publicPath.endsWith("/**")) {
+                String basePath = publicPath.substring(0, publicPath.length() - 2);
+                if (path.startsWith(basePath)) {
+                    return true;
+                }
+            }
+
+            // Verificar outros padrões (retrocompatibilidade)
+            if (publicPath.endsWith("/") && path.startsWith(publicPath)) {
+                return true;
+            }
         }
 
         return false;
