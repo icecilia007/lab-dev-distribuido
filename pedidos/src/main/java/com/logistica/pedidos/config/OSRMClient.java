@@ -29,7 +29,6 @@ public class OSRMClient {
         String url = String.format("%s/route/v1/driving/%s,%s;%s,%s?overview=full&geometries=geojson",
                 osrmBaseUrl, origemLon, origemLat, destinoLon, destinoLat);
         try {
-            // Utilizando overview=full para obter a rota completa e geometries=geojson para a geometria em GeoJSON
             ResponseEntity<JsonNode> response = restTemplate.getForEntity(url, JsonNode.class);
 
 

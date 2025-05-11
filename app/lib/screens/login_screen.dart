@@ -1,6 +1,8 @@
 // lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'register_screen.dart'; // Adicionando importação para a tela de registro
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
@@ -41,28 +43,40 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      print("Iniciando processo de login na UI...");
       final success = await widget.authService.login(
         _emailController.text,
         _passwordController.text,
       );
 
-      if (success) {
-        widget.onLoginSuccess();
-      } else {
-        setState(() {
-          _errorMessage = 'Credenciais inválidas. Tente novamente.';
-        });
+      if (mounted) {
+        print("Login resultado: $success");
+        if (success) {
+          print("Login bem-sucedido, executando callback...");
+          Navigator.of(context).pushReplacementNamed('/home');
+          widget.onLoginSuccess();
+        } else {
+          setState(() {
+            _errorMessage = 'Credenciais inválidas. Tente novamente.';
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erro ao realizar login: $e';
-      });
+      print("Exceção capturada na UI: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erro ao realizar login: $e';
+        });
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +162,36 @@ class _LoginScreenState extends State<LoginScreen> {
                         'ENTRAR',
                         style: TextStyle(fontSize: 16),
                       ),
+                    ),
+                    // Adicionando a integração com a tela de registro
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Não tem uma conta?'),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => RegisterScreen(
+                                  apiService: widget.authService.apiService,
+                                  onRegisterSuccess: () {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Registro realizado com sucesso! Faça login para continuar.'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  },
+                                )
+                              ),
+                            );
+                          },
+                          child: const Text('Registre-se aqui'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
