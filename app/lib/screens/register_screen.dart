@@ -61,44 +61,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
+      // Criar objeto com dados comuns
       Map<String, dynamic> userData = {
         'nome': _nomeController.text,
         'email': _emailController.text,
         'senha': _senhaController.text,
-        'tipo': _tipoUsuarioSelecionado,
         'telefone': _telefoneController.text,
+        'tipo': _tipoUsuarioSelecionado,
       };
 
+      // Adicionar campos específicos para motorista se necessário
       if (_tipoUsuarioSelecionado == 'motorista') {
         userData['placa'] = _placaController.text;
         userData['modeloVeiculo'] = _modeloVeiculoController.text;
         userData['anoVeiculo'] = int.tryParse(_anoVeiculoController.text) ?? 0;
         userData['consumoMedioPorKm'] = double.tryParse(_consumoMedioController.text) ?? 0.0;
-        userData['status'] = 'DISPONIVEL'; // Status padrão
+        userData['status'] = 'DISPONIVEL';
       }
 
-      String endpoint;
+      bool success = false;
+
+      // Usar os métodos específicos do ApiService
       switch (_tipoUsuarioSelecionado) {
         case 'cliente':
-          endpoint = '${widget.apiService.apiGatewayUrl}/api/usuarios/clientes';
+          success = await widget.apiService.registrarCliente(userData);
           break;
         case 'motorista':
-          endpoint = '${widget.apiService.apiGatewayUrl}/api/usuarios/motoristas';
+          success = await widget.apiService.registrarMotorista(userData);
           break;
         case 'operador':
-          endpoint = '${widget.apiService.apiGatewayUrl}/api/usuarios/operadores';
+          success = await widget.apiService.registrarOperador(userData);
           break;
         default:
           throw Exception('Tipo de usuário inválido');
       }
 
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(userData),
-      );
-
-      if (response.statusCode == 201) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Registro realizado com sucesso!'),
@@ -108,7 +106,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         widget.onRegisterSuccess();
       } else {
         setState(() {
-          _errorMessage = 'Falha ao registrar: ${response.body}';
+          _errorMessage = 'Falha ao registrar. Por favor, tente novamente.';
         });
       }
     } catch (e) {

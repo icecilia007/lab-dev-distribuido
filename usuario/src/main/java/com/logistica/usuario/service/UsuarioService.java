@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioService {
-    Cliente criarCliente(Cliente cliente);
+    UsuarioResponse criarCliente(Cliente cliente);
 
     List<Cliente> buscarTodosClientes();
 

@@ -53,8 +53,8 @@ class _LoginScreenState extends State<LoginScreen> {
         print("Login resultado: $success");
         if (success) {
           print("Login bem-sucedido, executando callback...");
-          Navigator.of(context).pushReplacementNamed('/home');
           widget.onLoginSuccess();
+          Navigator.of(context).pushReplacementNamed('/home');
         } else {
           setState(() {
             _errorMessage = 'Credenciais inválidas. Tente novamente.';

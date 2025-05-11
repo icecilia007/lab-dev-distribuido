@@ -68,9 +68,8 @@ class _LogisticaAppState extends State<LogisticaApp> {
     setState(() {
       _isLoggedIn = true;
     });
-
-    // Adicione esta linha para navegação explícita
-    Navigator.of(context).pushReplacementNamed('/home');
+    // // Adicione esta linha para navegação explícita
+    // Navigator.of(context).pushReplacementNamed('/home');
   }
 
   @override
