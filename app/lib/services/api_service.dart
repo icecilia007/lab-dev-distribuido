@@ -1,10 +1,14 @@
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import '../models/pedido.dart';
 import '../models/localizacao.dart';
 import '../models/user.dart';
+import 'database_service.dart';
 
 class ApiService {
+
+  final DatabaseService _databaseService = DatabaseService();
   final String apiGatewayUrl;
 
   String? _authToken;
@@ -137,20 +141,42 @@ class ApiService {
   }
 
   Future<List<Pedido>> getPedidosByCliente(int clienteId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/cliente/$clienteId'),
-        headers: _authHeaders,
-      );
 
-      if (response.statusCode == 200) {
-        List pedidosJson = jsonDecode(response.body);
-        return pedidosJson.map((json) => Pedido.fromJson(json)).toList();
-      } else {
-        throw Exception('Falha ao buscar pedidos: ${response.statusCode}');
+    var connectivityResult = await Connectivity().checkConnectivity();
+    bool isConnected = connectivityResult != ConnectivityResult.none;
+
+    if (isConnected) {
+      try {
+        final response = await http.get(
+          Uri.parse('$apiGatewayUrl/api/pedidos/cliente/$clienteId'),
+          headers: _authHeaders,
+        );
+
+        if (response.statusCode == 200) {
+
+          if (response.body.isEmpty) {
+            print('API retornou uma lista vazia para pedidos');
+            return [];
+          }
+          List<dynamic> pedidosJson = jsonDecode(response.body);
+          List<Pedido> pedidos = pedidosJson.map((json) => Pedido.fromJson(json)).toList();
+
+          for (var pedido in pedidos) {
+            if (pedido.status == 'ENTREGUE') {
+              await _databaseService.insertPedido(pedido);
+            }
+          }
+          return pedidos;
+        } else {
+          throw Exception('Falha ao buscar pedidos: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Erro ao buscar da API: $e. Tentando buscar do banco local...');
+        return await _databaseService.getPedidosByCliente(clienteId);
       }
-    } catch (e) {
-      throw Exception('Erro na requisição: $e');
+    } else {
+      print('Dispositivo offline. Buscando pedidos do banco local...');
+      return await _databaseService.getPedidosByCliente(clienteId);
     }
   }
 

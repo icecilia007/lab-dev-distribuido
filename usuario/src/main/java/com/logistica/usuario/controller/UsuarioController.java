@@ -32,8 +32,8 @@ public class UsuarioController {
     }
     // Endpoints para Cliente
     @PostMapping("/clientes")
-    public ResponseEntity<Cliente> criarCliente(@RequestBody Cliente cliente) {
-        Cliente novoCliente = usuarioService.criarCliente(cliente);
+    public ResponseEntity<UsuarioResponse> criarCliente(@RequestBody Cliente cliente) {
+        var novoCliente = usuarioService.criarCliente(cliente);
         return new ResponseEntity<>(novoCliente, HttpStatus.CREATED);
     }
 

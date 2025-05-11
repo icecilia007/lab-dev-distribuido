@@ -37,9 +37,30 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para Cliente
-    public Cliente criarCliente(Cliente cliente) {
-        return clienteRepository.save(cliente);
+    private UsuarioResponse converterParaUsuarioResponse(Usuario usuario) {
+        String tipo = "";
+        if (usuario instanceof Cliente) {
+            tipo = "CLIENTE";
+        } else if (usuario instanceof Motorista) {
+            tipo = "MOTORISTA";
+        } else if (usuario instanceof OperadorLogistico) {
+            tipo = "OPERADOR";
+        }
+
+        return new UsuarioResponse(
+                usuario.getId(),
+                usuario.getNome(),
+                usuario.getEmail(),
+                tipo,
+                usuario.getTelefone()
+        );
     }
+
+    public UsuarioResponse criarCliente(Cliente cliente) {
+        Cliente clienteSalvo = clienteRepository.save(cliente);
+        return converterParaUsuarioResponse(clienteSalvo);
+    }
+
 
     public Cliente atualizarCliente(Long id, Cliente clienteDetalhes) {
         Cliente cliente = clienteRepository.findById(id)

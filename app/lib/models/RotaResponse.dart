@@ -1,4 +1,6 @@
 
+import 'dart:convert';
+
 class RotaResponse {
   final double distanciaKm;
   final int tempoEstimadoMinutos;
@@ -9,6 +11,14 @@ class RotaResponse {
     required this.tempoEstimadoMinutos,
     required this.rota,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'distanciaKm': distanciaKm,
+      'tempoEstimadoMinutos': tempoEstimadoMinutos,
+      'rota': rota is Map || rota is List ? rota : jsonEncode(rota.toString()),
+    };
+  }
 
   factory RotaResponse.fromJson(Map<String, dynamic> json) {
     return RotaResponse(
