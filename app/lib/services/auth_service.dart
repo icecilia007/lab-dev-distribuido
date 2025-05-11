@@ -8,6 +8,7 @@ class AuthService {
 
   AuthService(this._apiService);
 
+  ApiService get apiService => _apiService;
   User? get currentUser => _currentUser;
 
   Future<bool> login(String email, String password) async {
@@ -15,12 +16,16 @@ class AuthService {
       final user = await _apiService.login(email, password);
       _currentUser = user;
 
-      // Salvar dados do usuário no SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('userId', user.id);
       await prefs.setString('userName', user.name);
       await prefs.setString('userEmail', user.email);
       await prefs.setString('userType', user.type);
+
+      // Salvar o token de autenticação
+      if (_apiService.authToken != null) {
+        await prefs.setString('authToken', _apiService.authToken!);
+      }
 
       return true;
     } catch (e) {
@@ -30,25 +35,29 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    print("Realizando logout e limpando token: ${_apiService.authToken}");
     _currentUser = null;
 
-    // Limpar dados do usuário do SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userId');
     await prefs.remove('userName');
     await prefs.remove('userEmail');
-    await prefs.remove('user');
+    await prefs.remove('userType');
+    await prefs.remove('authToken');
+
+    _apiService.authToken = null;
+    print("Token após logout: ${_apiService.authToken}");
   }
 
   Future<bool> autoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
+    final authToken = prefs.getString('authToken');
 
-    if (userId == null) {
+    if (userId == null || authToken == null) {
       return false;
     }
 
-    // Reconstruir usuário a partir do SharedPreferences
     _currentUser = User(
       id: userId,
       name: prefs.getString('userName') ?? '',
@@ -56,8 +65,10 @@ class AuthService {
       type: prefs.getString('userType') ?? '',
     );
 
+    _apiService.authToken = authToken;
+
     return true;
   }
 
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null && _apiService.authToken != null;
 }

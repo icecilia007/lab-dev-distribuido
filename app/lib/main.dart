@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/login_screen.dart';
@@ -10,11 +11,9 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar serviços com as URLs apropriadas
+  // Inicializar serviços com a URL do API Gateway
   final apiService = ApiService(
-      usuarioServiceUrl: 'http://10.0.2.2:8080',
-      pedidoServiceUrl: 'http://10.0.2.2:8081',
-      rastreamentoServiceUrl: 'http://10.0.2.2:8082'
+    apiGatewayUrl: 'http://10.0.2.2:8000',
   );
 
   final authService = AuthService(apiService);
@@ -69,10 +68,14 @@ class _LogisticaAppState extends State<LogisticaApp> {
     setState(() {
       _isLoggedIn = true;
     });
+
+    // Adicione esta linha para navegação explícita
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 
   @override
   Widget build(BuildContext context) {
+    print("Building LogisticaApp - isLoggedIn: $_isLoggedIn");
     return MaterialApp(
       title: 'Logística App',
       theme: ThemeData(
