@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import '../models/pedido.dart';
@@ -141,7 +142,6 @@ class ApiService {
   }
 
   Future<List<Pedido>> getPedidosByCliente(int clienteId) async {
-
     var connectivityResult = await Connectivity().checkConnectivity();
     bool isConnected = connectivityResult != ConnectivityResult.none;
 
@@ -153,20 +153,33 @@ class ApiService {
         );
 
         if (response.statusCode == 200) {
+          print('Response headers: ${response.headers}');
+          print('Response content type: ${response.headers['content-type']}');
 
           if (response.body.isEmpty) {
             print('API retornou uma lista vazia para pedidos');
             return [];
           }
-          List<dynamic> pedidosJson = jsonDecode(response.body);
-          List<Pedido> pedidos = pedidosJson.map((json) => Pedido.fromJson(json)).toList();
 
-          for (var pedido in pedidos) {
-            if (pedido.status == 'ENTREGUE') {
-              await _databaseService.insertPedido(pedido);
+          try {
+            // Adicione log para ver o início do body
+            print('Primeiros 100 caracteres: ${response.body.substring(0, min(100, response.body.length))}');
+
+            List<dynamic> pedidosJson = jsonDecode(response.body);
+            print('JSON decodificado com sucesso. Encontrados ${pedidosJson.length} pedidos');
+            List<Pedido> pedidos = pedidosJson.map((json) => Pedido.fromJson(json)).toList();
+
+            for (var pedido in pedidos) {
+              if (pedido.status == 'ENTREGUE') {
+                await _databaseService.insertPedido(pedido);
+              }
             }
+
+            return pedidos;
+          } catch (e) {
+            print('Erro ao decodificar JSON: $e');
+            throw Exception('Erro ao processar resposta: $e');
           }
-          return pedidos;
         } else {
           throw Exception('Falha ao buscar pedidos: ${response.statusCode}');
         }
