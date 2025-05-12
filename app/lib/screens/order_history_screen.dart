@@ -7,12 +7,14 @@ import 'order_tracking_screen.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   final int userId;
+  final String userType;
   final ApiService apiService;
 
   const OrderHistoryScreen({
     Key? key,
     required this.userId,
     required this.apiService,
+    required this.userType,
   }) : super(key: key);
 
   @override
@@ -39,7 +41,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   void _loadPedidos() {
-    _pedidos = widget.apiService.getPedidosByCliente(widget.userId);
+    _pedidos = widget.apiService.getPedidosByCliente(widget.userId,widget.userType);
   }
 
   @override

@@ -54,7 +54,6 @@ class _LoginScreenState extends State<LoginScreen> {
         if (success) {
           print("Login bem-sucedido, executando callback...");
           widget.onLoginSuccess();
-          Navigator.of(context).pushReplacementNamed('/home');
         } else {
           setState(() {
             _errorMessage = 'Credenciais inválidas. Tente novamente.';
@@ -76,7 +75,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

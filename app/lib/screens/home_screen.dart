@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadPedidosAtivos() {
     final user = widget.authService.currentUser!;
-    _pedidosAtivos = widget.apiService.getPedidosByCliente(user.id);
+    _pedidosAtivos = widget.apiService.getPedidosByCliente(user.id,user.type.toLowerCase() );
   }
 
   void _onItemTapped(int index) {
@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final List<Widget> _widgetOptions = <Widget>[
       _buildDashboard(user.id),
-      OrderHistoryScreen(userId: user.id, apiService: widget.apiService),
+      OrderHistoryScreen(userId: user.id, apiService: widget.apiService,userType: user.type,),
       SettingsScreen(onLogout: _logout, authService: widget.authService, apiService: widget.apiService,),
     ];
 
