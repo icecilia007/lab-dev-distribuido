@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import 'screens/new_order_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'screens/driver_home_screen.dart';
 
 
 void main() async {
@@ -67,6 +69,9 @@ class LogisticaApp extends StatefulWidget {
 class _LogisticaAppState extends State<LogisticaApp> {
   bool _isInitialized = false;
   bool _isLoggedIn = false;
+  String? _userType;
+
+  final navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -75,11 +80,14 @@ class _LogisticaAppState extends State<LogisticaApp> {
   }
 
   Future<void> _initializeApp() async {
-    final success = await widget.authService.autoLogin();
+    final result = await widget.authService.autoLogin();
+    final success = result['success'];
+    final userType = result['userType'];
 
     setState(() {
       _isLoggedIn = success;
       _isInitialized = true;
+      _userType = userType;
     });
   }
 
@@ -110,12 +118,25 @@ class _LogisticaAppState extends State<LogisticaApp> {
       _isLoggedIn = true;
     });
     _connectToWebSocket();
+
+    final userType = widget.authService.currentUser?.type;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (userType == 'MOTORISTA') {
+        navigatorKey.currentState?.pushReplacementNamed('/motorista');
+      } else if (userType == 'CLIENTE') {
+        navigatorKey.currentState?.pushReplacementNamed('/home');
+      } else {
+        navigatorKey.currentState?.pushReplacementNamed('/home');
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     print("Building LogisticaApp - isLoggedIn: $_isLoggedIn");
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Logística App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -143,6 +164,10 @@ class _LogisticaAppState extends State<LogisticaApp> {
           authService: widget.authService,
           apiService: widget.apiService,
         ),
+        '/motorista': (context) => DriverHomeScreen(
+          authService: widget.authService,
+          apiService: widget.apiService,
+        ),
         '/novo-pedido': (context) => NewOrderScreen(
           apiService: widget.apiService,
           authService: widget.authService,
@@ -154,6 +179,11 @@ class _LogisticaAppState extends State<LogisticaApp> {
           ? LoginScreen(
         authService: widget.authService,
         onLoginSuccess: _handleLoginSuccess,
+      )
+          : _userType == 'MOTORISTA'
+          ? DriverHomeScreen(
+        authService: widget.authService,
+        apiService: widget.apiService,
       )
           : HomeScreen(
         authService: widget.authService,

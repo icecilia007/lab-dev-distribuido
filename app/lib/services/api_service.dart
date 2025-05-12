@@ -142,14 +142,32 @@ class ApiService {
     }
   }
 
-  Future<List<Pedido>> getPedidosByCliente(int clienteId) async {
+  Future<List<Pedido>> getPedidosByMotorista(int motoristaId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$apiGatewayUrl/api/pedidos/motorista/$motoristaId'),
+        headers: _authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        List pedidosJson = jsonDecode(response.body);
+        return pedidosJson.map((json) => Pedido.fromJson(json)).toList();
+      } else {
+        throw Exception('Falha ao buscar pedidos do motorista: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro na requisição: $e');
+    }
+  }
+
+  Future<List<Pedido>> getPedidosByCliente(int clienteId, userType) async {
     var connectivityResult = await Connectivity().checkConnectivity();
     bool isConnected = connectivityResult != ConnectivityResult.none;
 
     if (isConnected) {
       try {
         final response = await http.get(
-          Uri.parse('$apiGatewayUrl/api/pedidos/cliente/$clienteId'),
+          Uri.parse('$apiGatewayUrl/api/pedidos/$userType/$clienteId'),
           headers: _authHeaders,
         );
 
