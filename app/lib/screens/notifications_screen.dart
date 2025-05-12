@@ -17,12 +17,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final notificationManager = Provider.of<NotificationManager>(context);
     final notificacoes = notificationManager.notificacoes;
 
-    if (notificationManager.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (notificacoes.isEmpty) {
-      return Center(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notificações'),
+      ),
+      body: notificationManager.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : notificacoes.isEmpty
+          ? Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
@@ -34,20 +36,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ],
         ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: notificacoes.length,
-      itemBuilder: (context, index) {
-        final notificacao = notificacoes[index];
-        return NotificationItem(
-          notificacao: notificacao,
-          onTap: () => _handleNotificationTap(context, notificacao),
-        );
-      },
+      )
+          : ListView.builder(
+        itemCount: notificacoes.length,
+        itemBuilder: (context, index) {
+          final notificacao = notificacoes[index];
+          return NotificationItem(
+            notificacao: notificacao,
+            onTap: () => _handleNotificationTap(context, notificacao),
+          );
+        },
+      ),
     );
   }
+
 
   void _handleNotificationTap(BuildContext context, Notificacao notificacao) async {
     final notificationManager = Provider.of<NotificationManager>(context, listen: false);
