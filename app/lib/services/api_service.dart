@@ -413,4 +413,66 @@ class ApiService {
   }
 
 
+
+  Future<bool> updateDeliveryStatus(
+      int pedidoId,
+      String newStatus,
+      {required String imagePath}
+      ) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/status'),
+      );
+
+      _authHeaders.forEach((key, value) {
+        request.headers[key] = value;
+      });
+
+      request.fields['status'] = newStatus;
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'evidenceImage',
+          imagePath,
+        ),
+      );
+
+      var response = await request.send();
+
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      throw Exception('Erro na requisição: $e');
+    }
+  }
+
+  Future<bool> atualizarLocalizacaoMotorista(
+      int motoristaId,
+      double latitude,
+      double longitude,
+      String statusVeiculo,
+      {int? pedidoId}
+      ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiGatewayUrl/api/rastreamento/localizacao'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'motoristaId': motoristaId,
+          'pedidoId': pedidoId,
+          'latitude': latitude,
+          'longitude': longitude,
+          'statusVeiculo': statusVeiculo
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as bool;
+      } else {
+        throw Exception('Falha ao atualizar localização: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro na requisição: $e');
+    }
+  }
 }

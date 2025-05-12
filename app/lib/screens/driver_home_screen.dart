@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -12,6 +11,7 @@ import '../services/notification_service.dart';
 import 'dialog/new_order_details_dialog.dart';
 import 'notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
+import 'package:geolocator/geolocator.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -134,6 +134,93 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
+  }
+
+  Future<void> _updateDeliveryWithCamera(int entregaId, String newStatus) async {
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.camera);
+
+      if (image == null) {
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final success = await widget.apiService.updateDeliveryStatus(
+        entregaId,
+        newStatus,
+        imagePath: image.path,
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      if (success && mounted) {
+        setState(() {
+          _loadEntregasAtivas();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status atualizado para $newStatus com foto'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar status: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showUpdateStatusDialog(int entregaId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Atualizar Status da Entrega'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.local_shipping, color: Colors.blue),
+                title: const Text('Em Rota (com foto)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateDeliveryWithCamera(entregaId, 'EM_ROTA');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.check_circle, color: Colors.green),
+                title: const Text('Entregue (com foto)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateDeliveryWithCamera(entregaId, 'ENTREGUE');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.report_problem, color: Colors.orange),
+                title: const Text('Reportar Problema'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showReportProblemDialog(entregaId);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -299,7 +386,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
+  String _currentStatus = 'DISPONIVEL';
+
   Widget _buildStatusButton() {
+    Color buttonColor;
+    IconData buttonIcon;
+
+    switch (_currentStatus) {
+      case 'DISPONIVEL':
+        buttonColor = Colors.green;
+        buttonIcon = Icons.check_circle;
+        break;
+      case 'EM_MOVIMENTO':
+        buttonColor = Colors.blue;
+        buttonIcon = Icons.directions_car;
+        break;
+      case 'PARADO':
+        buttonColor = Colors.orange;
+        buttonIcon = Icons.pause_circle_filled;
+        break;
+      default:
+        buttonColor = Colors.grey;
+        buttonIcon = Icons.help_outline;
+    }
+
     return ElevatedButton.icon(
       onPressed: () {
         _showStatusDialog();
@@ -311,6 +421,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         foregroundColor: Colors.white,
       ),
     );
+  }
+
+  String _formatStatus(String status) {
+    switch (status) {
+      case 'DISPONIVEL': return 'Disponível';
+      case 'EM_MOVIMENTO': return 'Em Movimento';
+      case 'PARADO': return 'Parado';
+      default: return status;
+    }
   }
 
   void _showStatusDialog() {
@@ -327,23 +446,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 title: const Text('Disponível'),
                 onTap: () {
                   Navigator.pop(context);
-                  // Implementar atualização de status
+                  _updateDriverStatus("DISPONIVEL");
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delivery_dining, color: Colors.blue),
-                title: const Text('Em Entrega'),
+                leading: const Icon(Icons.directions_car, color: Colors.blue),
+                title: const Text('Em Movimento'),
                 onTap: () {
                   Navigator.pop(context);
-                  // Implementar atualização de status
+                  _updateDriverStatus("EM_MOVIMENTO");
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.do_not_disturb_on, color: Colors.red),
-                title: const Text('Indisponível'),
+                leading: const Icon(Icons.pause_circle_filled, color: Colors.orange),
+                title: const Text('Parado'),
                 onTap: () {
                   Navigator.pop(context);
-                  // Implementar atualização de status
+                  _updateDriverStatus("PARADO");
                 },
               ),
             ],
@@ -351,6 +470,83 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
       },
     );
+  }
+
+  Future<Position> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permissions are denied.');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('Location permissions are permanently denied.');
+    }
+
+    // Get the current position
+    return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> _updateDriverStatus(String statusVeiculo) async {
+    final user = widget.authService.currentUser!;
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Get current location
+      final position = await _getCurrentLocation();
+
+      // Dismiss loading indicator
+      if (mounted) Navigator.pop(context);
+
+      final bool success = await widget.apiService.atualizarLocalizacaoMotorista(
+        user.id,
+        position.latitude,
+        position.longitude,
+        statusVeiculo,
+      );
+
+      if (success && mounted) {
+        setState(() {
+          _currentStatus = statusVeiculo;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status atualizado para ${_formatStatus(statusVeiculo)}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Dismiss loading indicator if showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar status: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildEntregaCard(Pedido entrega) {
@@ -514,7 +710,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Implementar envio do relatório
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Problema reportado com sucesso'),
