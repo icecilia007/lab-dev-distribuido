@@ -21,7 +21,7 @@ public interface UsuarioService {
 
     void deletarCliente(Long id);
 
-    Motorista criarMotorista(Motorista motorista);
+    UsuarioResponse criarMotorista(Motorista motorista);
 
     List<Motorista> buscarTodosMotoristas();
 
@@ -33,7 +33,7 @@ public interface UsuarioService {
 
     void deletarMotorista(Long id);
 
-    OperadorLogistico criarOperador(OperadorLogistico operador);
+    UsuarioResponse criarOperador(OperadorLogistico operador);
 
     List<OperadorLogistico> buscarTodosOperadores();
 

@@ -385,4 +385,19 @@ class ApiService {
       throw Exception('Erro na requisição: $e');
     }
   }
+
+  Future<bool> aceitarPedido(int pedidoId, int motoristaId, double latitude, double longitude) async {
+    try {
+      final uri = Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/aceitar?motoristaId=$motoristaId&latitude=$latitude&longitude=$longitude');
+      final response = await http.post(
+        uri,
+        headers: _authHeaders,
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Erro ao aceitar pedido: $e');
+      return false;
+    }
+  }
 }

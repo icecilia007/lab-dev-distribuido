@@ -38,8 +38,19 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (details) {
+        if (details.payload != null) {
+          try {
+            final payloadData = jsonDecode(details.payload!);
+            if (_onNotificationReceived != null) {
+              _onNotificationReceived!(payloadData);
+            }
+          } catch (e) {
+            print('Erro ao processar payload da notificação: $e');
+          }
+        }
       },
     );
+
   }
 
 
@@ -116,11 +127,46 @@ class NotificationService {
 
       print('WebSocket - Dados da notificação: $notificationData');
 
-      showNotification(
-        id: notificationData['id'] ?? DateTime.now().millisecondsSinceEpoch,
-        title: notificationData['titulo'] ?? 'Nova notificação',
-        body: notificationData['mensagem'] ?? '',
-      );
+      String? tipoEvento = notificationData['tipoEvento'] ??
+          notificationData['evento'] ??
+          notificationData['dadosEvento']?['evento'];
+
+      if(tipoEvento!=null) {
+        if (tipoEvento == 'PEDIDO_DISPONIVEL') {
+          final pedidoId = notificationData['dadosEvento']?['dados']?['pedidoId'];
+
+          final notificacaoFormatada = {
+            'id': pedidoId ?? DateTime
+                .now()
+                .millisecondsSinceEpoch,
+            'titulo': 'Novo pedido disponível',
+            'mensagem': notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
+            'dataCriacao': DateTime.now().toIso8601String(),
+            'lida': false,
+            'payload': jsonEncode(notificationData)
+          };
+
+          showNotification(
+            id: pedidoId ?? DateTime
+                .now()
+                .millisecondsSinceEpoch,
+            title: 'Novo pedido disponível',
+            body: notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
+            payload: jsonEncode(notificationData),
+          );
+
+          if (_onNotificationReceived != null) {
+            _onNotificationReceived!(notificacaoFormatada);
+          }
+        } else{
+          showNotification(
+            id: notificationData['id'] ?? DateTime.now().millisecondsSinceEpoch,
+            title: notificationData['titulo'] ?? 'Nova notificação',
+            body: notificationData['mensagem'] ?? '',
+          );
+        }
+
+      }
 
       if (_onNotificationReceived != null) {
         print('WebSocket - Chamando callback de notificação');
@@ -140,10 +186,11 @@ class NotificationService {
     _onNotificationReceived = callback;
   }
 
-  Future showNotification({
+  Future<void> showNotification({
     required int id,
     required String title,
     required String body,
+    String? payload,
   }) async {
     const AndroidNotificationDetails androidNotificationDetails =
     AndroidNotificationDetails(
@@ -153,14 +200,17 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
     );
+
     const NotificationDetails notificationDetails = NotificationDetails(
       android: androidNotificationDetails,
     );
+
     await flutterLocalNotificationsPlugin.show(
       id,
       title,
       body,
       notificationDetails,
+      payload: payload,
     );
   }
 

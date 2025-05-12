@@ -8,6 +8,7 @@ class Notificacao {
   final String dataCriacao;
   final String? dataLeitura;
   bool lida;
+  final String? payload;
 
   Notificacao({
     required this.id,
@@ -19,6 +20,7 @@ class Notificacao {
     required this.dataCriacao,
     this.dataLeitura,
     this.lida = false,
+    this.payload,
   });
 
   factory Notificacao.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class Notificacao {
       dataCriacao: json['dataCriacao'] ?? DateTime.now().toIso8601String(),
       dataLeitura: json['dataLeitura'],
       lida: json['dataLeitura'] != null,
+      payload: json['payload'],
     );
   }
 }

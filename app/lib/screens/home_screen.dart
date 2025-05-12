@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logística App'),
+        title: const Text('Logística'),
         actions: [
           Consumer<NotificationManager>(
             builder: (context, notificationManager, child) {

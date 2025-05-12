@@ -1,7 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:provider/provider.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart';
+import '../services/notification_manager.dart';
+import '../services/notification_service.dart';
+import 'dialog/new_order_details_dialog.dart';
+import 'notifications_screen.dart';
+import 'package:badges/badges.dart' as badges;
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -25,11 +35,89 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void initState() {
     super.initState();
     _loadEntregasAtivas();
+    _initializeLocationService();
+    _setupNotificationHandling();
   }
 
   void _loadEntregasAtivas() {
     final user = widget.authService.currentUser!;
     _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
+  }
+
+  Future<void> _initializeLocationService() async {
+    final locationService = LocationService();
+    bool hasPermission = await locationService.init();
+    if (!hasPermission && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Permissão de localização necessária para funcionamento completo do app'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _setupNotificationHandling() {
+    final notificationService = Provider.of<NotificationService>(context, listen: false);
+
+    notificationService.setNotificationCallback((data) {
+      // Verificar diferentes estruturas possíveis
+      if (data['tipoEvento'] == 'PEDIDO_DISPONIVEL' ||
+          (data['dadosEvento'] != null && data['dadosEvento']['evento'] == 'PEDIDO_DISPONIVEL')) {
+
+        _showPedidoDisponivel(data);
+      }
+    });
+
+    // Ajustar também o método que processa notificações quando o app é aberto por uma notificação
+    FlutterLocalNotificationsPlugin().getNotificationAppLaunchDetails().then((details) {
+      if (details != null && details.didNotificationLaunchApp &&
+          details.notificationResponse?.payload != null) {
+        try {
+          final data = jsonDecode(details.notificationResponse!.payload!);
+          if (data['tipoEvento'] == 'PEDIDO_DISPONIVEL' ||
+              (data['dadosEvento'] != null && data['dadosEvento']['evento'] == 'PEDIDO_DISPONIVEL')) {
+            _showPedidoDisponivel(data);
+          }
+        } catch (e) {
+          print('Erro ao processar payload da notificação: $e');
+        }
+      }
+    });
+  }
+
+  void _showPedidoDisponivel(Map<String, dynamic> data) {
+    // Obter os dados do pedido da estrutura correta
+    final pedidoData = data['dadosEvento'] != null ?
+    data['dadosEvento']['dados'] :
+    data['dados'];
+
+    if (pedidoData == null) {
+      print('Dados do pedido não encontrados na notificação');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => NewOrderDetailsDialog(
+        pedidoData: pedidoData,
+        apiService: widget.apiService,
+        motoristaId: widget.authService.currentUser!.id,
+        onAccepted: () {
+          setState(() {
+            _loadEntregasAtivas();
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pedido aceito com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _onItemTapped(int index) {
@@ -59,8 +147,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logística App - Motorista'),
+        title: const Text('Logística'),
         actions: [
+          Consumer<NotificationManager>(
+            builder: (context, notificationManager, child) {
+              return badges.Badge(
+                position: badges.BadgePosition.topEnd(top: 5, end: 5),
+                showBadge: notificationManager.unreadCount > 0,
+                badgeContent: Text(
+                  notificationManager.unreadCount.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.exit_to_app),
             onPressed: _logout,
