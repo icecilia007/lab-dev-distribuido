@@ -64,6 +64,13 @@ spring:
           uri: http://localhost:8083
           predicates:
             - Path=/api/notificacoes/**
+        # Rota para WebSocket de Notificações
+        - id: notificacao-websocket
+          uri: ws://localhost:8083
+          predicates:
+            - Path=/ws-notificacao/**
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
 
       # Configurações globais
       default-filters:
