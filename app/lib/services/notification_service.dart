@@ -62,15 +62,15 @@ class NotificationService {
 
     try {
 
-      final wsUrl = Uri(
-          scheme: 'ws',
-          host: '10.0.2.2',
-          port: 8000,
-          path: '/ws-notificacao',
-          queryParameters: {'userId': userId}
-      ).toString();
+      // final wsUrl = Uri(
+      //     scheme: 'ws',
+      //     host: '10.0.2.2',
+      //     port: 8000,
+      //     path: '/ws-notificacao',
+      //     queryParameters: {'userId': userId}
+      // ).toString();
 
-      //final wsUrl = 'ws://10.0.2.2:8000/ws-notificacao?userId=$userId';
+      final wsUrl = 'ws://10.0.2.2:8000/ws-notificacao?userId=$userId';
 
       _channel = IOWebSocketChannel.connect(
         Uri.parse(wsUrl),

@@ -141,7 +141,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final user = widget.authService.currentUser!;
     final List<Widget> _widgetOptions = [
       _buildDashboard(user.id),
-      _buildEntregasHistorico(user.id),
+      // _buildEntregasHistorico(user.id),
       _buildConfiguracoesMotorista(),
     ];
 
@@ -185,10 +185,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             icon: Icon(Icons.local_shipping),
             label: 'Entregas',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Histórico',
-          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.history),
+          //   label: 'Histórico',
+          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Configurações',
@@ -574,12 +574,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildEntregasHistorico(int motoristId) {
-    // Implementar histórico de entregas do motorista
-    return const Center(
-      child: Text('Histórico de Entregas'),
-    );
-  }
+  // Widget _buildEntregasHistorico(int motoristId) {
+  //   return const Center(
+  //     child: Text('Histórico de Entregas'),
+  //   );
+  // }
 
   Widget _buildConfiguracoesMotorista() {
     // Implementar configurações do motorista
