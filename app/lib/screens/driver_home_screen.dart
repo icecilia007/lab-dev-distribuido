@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -31,6 +32,9 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int _selectedIndex = 0;
+  bool _isDarkMode = false;
+  bool _pushNotificationsEnabled = false;
+  bool _emailNotificationsEnabled = false;
   late Future<List<Pedido>> _entregasAtivas;
 
   @override
@@ -39,6 +43,51 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _loadEntregasAtivas();
     _initializeLocationService();
     _setupNotificationHandling();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      _isDarkMode = prefs.getBool('darkMode') ?? false;
+      _pushNotificationsEnabled = prefs.getBool('pushNotifications') ?? false;
+      _emailNotificationsEnabled = prefs.getBool('emailNotifications') ?? false;
+    });
+
+    // Carrega configurações do servidor, se necessário
+    if (widget.authService.currentUser != null) {
+      final userId = widget.authService.currentUser!.id;
+      final apiPreferences = await widget.apiService.buscarPreferenciasNotificacao(userId);
+
+      if (apiPreferences != null) {
+        final tipoPreferido = apiPreferences['tipoPreferido'] as String;
+        setState(() {
+          _pushNotificationsEnabled = tipoPreferido == 'PUSH' || tipoPreferido == 'AMBOS';
+          _emailNotificationsEnabled = tipoPreferido == 'EMAIL' || tipoPreferido == 'AMBOS';
+        });
+      }
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('darkMode', _isDarkMode);
+    await prefs.setBool('pushNotifications', _pushNotificationsEnabled);
+    await prefs.setBool('emailNotifications', _emailNotificationsEnabled);
+
+    if (widget.authService.currentUser != null) {
+      final userId = widget.authService.currentUser!.id;
+      final userEmail = widget.authService.currentUser!.email;
+
+      // Atualiza preferências no servidor
+      await widget.apiService.atualizarPreferenciasNotificacao(
+        userId,
+        _emailNotificationsEnabled,
+        _pushNotificationsEnabled,
+        userEmail,
+      );
+    }
   }
 
   void _loadEntregasAtivas() {
@@ -306,11 +355,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Olá, ${widget.authService.currentUser!.name}!',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                Flexible(
+                  child: Text(
+                    'Olá, ${widget.authService.currentUser!.name}!',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 _buildStatusButton(),
@@ -745,64 +797,112 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // }
 
   Widget _buildConfiguracoesMotorista() {
-    // Implementar configurações do motorista
-    return Center(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircleAvatar(
-            radius: 50,
-            child: Icon(Icons.person, size: 50),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.authService.currentUser!.name,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            widget.authService.currentUser!.email,
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-          if (widget.authService.currentUser!.phone != null)
-            Text(
-              widget.authService.currentUser!.phone!,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+          const Text(
+            'Configurações',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-          const SizedBox(height: 32),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionTitle('Aparência'),
+          SwitchListTile(
+            title: const Text('Tema Escuro'),
+            subtitle: const Text('Ativar o tema escuro para o aplicativo'),
+            value: _isDarkMode,
+            onChanged: (value) {
+              setState(() {
+                _isDarkMode = value;
+              });
+              _saveSettings();
+            },
+          ),
+          const Divider(),
+          _buildSectionTitle('Notificações'),
+          SwitchListTile(
+            title: const Text('Notificações Push'),
+            subtitle: const Text('Receber notificações push sobre suas entregas'),
+            value: _pushNotificationsEnabled,
+            onChanged: (value) {
+              setState(() {
+                _pushNotificationsEnabled = value;
+              });
+              _saveSettings();
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Notificações por Email'),
+            subtitle: const Text('Receber atualizações por email'),
+            value: _emailNotificationsEnabled,
+            onChanged: (value) {
+              setState(() {
+                _emailNotificationsEnabled = value;
+              });
+              _saveSettings();
+            },
+          ),
+          const Divider(),
+          _buildSectionTitle('Meu Veículo'),
           ListTile(
-            leading: const Icon(Icons.directions_car),
             title: const Text('Meus Veículos'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(Icons.keyboard_arrow_right),
             onTap: () {
-              // Implementar navegação para tela de veículos
+              // Implementação da navegação para tela de veículos
+            },
+          ),
+          const Divider(),
+          _buildSectionTitle('Sobre o App'),
+          const ListTile(
+            title: Text('Versão'),
+            trailing: Text('1.0.0'),
+          ),
+          ListTile(
+            title: const Text('Termos de Uso'),
+            trailing: const Icon(Icons.keyboard_arrow_right),
+            onTap: () {
+              // Navegação para termos de uso
             },
           ),
           ListTile(
-            leading: const Icon(Icons.analytics),
-            title: const Text('Desempenho'),
-            trailing: const Icon(Icons.chevron_right),
+            title: const Text('Política de Privacidade'),
+            trailing: const Icon(Icons.keyboard_arrow_right),
             onTap: () {
-              // Implementar navegação para tela de desempenho
+              // Navegação para política de privacidade
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.notifications),
-            title: const Text('Notificações'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Implementar navegação para tela de notificações
-            },
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: _logout,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _logout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('Sair da Conta'),
             ),
-            child: const Text('Sair'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue,
+        ),
       ),
     );
   }
