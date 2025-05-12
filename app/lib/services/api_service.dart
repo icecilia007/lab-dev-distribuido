@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:app/models/notificacao.dart';
 import '../models/pedido.dart';
 import '../models/localizacao.dart';
 import '../models/user.dart';
@@ -252,6 +253,83 @@ class ApiService {
       return response.statusCode == 204;
     } catch (e) {
       throw Exception('Erro na requisição: $e');
+    }
+  }
+
+  Future<bool> atualizarPreferenciasNotificacao(
+      int usuarioId,
+      bool emailEnabled,
+      bool pushEnabled,
+      String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'usuarioId': usuarioId,
+          'tipoPreferido': pushEnabled && emailEnabled ? 'AMBOS'
+              : pushEnabled ? 'PUSH'
+              : emailEnabled ? 'EMAIL'
+              : 'NENHUM',
+          'email': email,
+        }),
+      );
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Erro ao atualizar preferências: $e');
+      return false;
+    }
+  }
+
+  Future<List<Notificacao>> buscarNotificacoes(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$apiGatewayUrl/api/notificacoes/destinatario/$userId'),
+        headers: _authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Notificacao.fromJson(json)).toList();
+      } else {
+        print('Erro ao buscar notificações: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Exceção ao buscar notificações: $e');
+      return [];
+    }
+  }
+
+  Future<bool> marcarNotificacaoComoLida(int notificacaoId) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$apiGatewayUrl/api/notificacoes/$notificacaoId/marcar-lida'),
+        headers: _authHeaders,
+      );
+      return response.statusCode == 204;
+    } catch (e) {
+      print('Erro ao marcar notificação como lida: $e');
+      return false;
+    }
+  }
+
+
+  Future<Map<String, dynamic>?> buscarPreferenciasNotificacao(int usuarioId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias/$usuarioId'),
+        headers: _authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Erro ao buscar preferências: $e');
+      return null;
     }
   }
 

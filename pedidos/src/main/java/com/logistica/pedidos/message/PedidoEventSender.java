@@ -129,8 +129,8 @@ public class PedidoEventSender {
 
             mensagem.put("dados", dados);
 
-            String routingKey = "pedidos.pedido.disponivel";
-            rabbitTemplate.convertAndSend(exchange, routingKey, mensagem);
+//            String routingKey = "pedidos.pedido.disponivel";
+//            rabbitTemplate.convertAndSend(exchange, routingKey, mensagem);
 
             for (MotoristaProximoDTO motorista : motoristasProximos) {
                 Map<String, Object> dadosIndividuais = new HashMap<>(dados);

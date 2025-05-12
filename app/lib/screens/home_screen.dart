@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_manager.dart';
 import 'new_order_screen.dart';
+import 'notifications_screen.dart';
 import 'order_tracking_screen.dart';
 import 'order_history_screen.dart';
 import 'settings_screen.dart';
+import 'package:badges/badges.dart' as badges;
+
 
 class HomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -59,13 +64,36 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> _widgetOptions = <Widget>[
       _buildDashboard(user.id),
       OrderHistoryScreen(userId: user.id, apiService: widget.apiService),
-      SettingsScreen(onLogout: _logout),
+      SettingsScreen(onLogout: _logout, authService: widget.authService, apiService: widget.apiService,),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Logística App'),
         actions: [
+          Consumer<NotificationManager>(
+            builder: (context, notificationManager, child) {
+              return badges.Badge(
+                position: badges.BadgePosition.topEnd(top: 5, end: 5),
+                showBadge: notificationManager.unreadCount > 0,
+                badgeContent: Text(
+                  notificationManager.unreadCount.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.exit_to_app),
             onPressed: _logout,

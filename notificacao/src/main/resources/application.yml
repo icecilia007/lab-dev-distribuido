@@ -16,6 +16,14 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: dev.g2002sj@gmail.com
+    password: hocfbciozvvaqvdn
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
 
 
 rabbitmq:

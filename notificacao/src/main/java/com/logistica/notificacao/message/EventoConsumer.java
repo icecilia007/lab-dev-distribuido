@@ -54,12 +54,18 @@ public class EventoConsumer {
     }
 
     private void processarDestinatarios(String tipoEvento, String origem, Map<String, Object> dados, Map<String, Object> mensagemCompleta) {
-        processarId(dados, "clienteId", tipoEvento, origem, mensagemCompleta);
-        processarId(dados, "motoristaId", tipoEvento, origem, mensagemCompleta);
-
-        processarLista(dados, "motoristasProximos", tipoEvento, origem, mensagemCompleta);
-        processarLista(dados, "motoristasANotificar", tipoEvento, origem, mensagemCompleta);
+        // Para eventos PEDIDO_DISPONIVEL, envie apenas para motoristas
+        if (tipoEvento.equals("PEDIDO_DISPONIVEL")) {
+            if (dados.containsKey("motoristasProximos")) {
+                processarLista(dados, "motoristasProximos", tipoEvento, origem, mensagemCompleta);
+            }
+        } else {
+            // Para outros eventos (como PEDIDO_CRIADO), processe normalmente
+            processarId(dados, "clienteId", tipoEvento, origem, mensagemCompleta);
+            processarId(dados, "motoristaId", tipoEvento, origem, mensagemCompleta);
+        }
     }
+
 
     private void processarId(Map<String, Object> dados, String campoId, String tipoEvento, String origem, Map<String, Object> mensagemCompleta) {
         if (dados.containsKey(campoId) && dados.get(campoId) != null) {
