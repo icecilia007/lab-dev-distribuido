@@ -31,19 +31,15 @@ public class NotificacaoServiceImpl implements NotificacaoService {
         this.emailService = emailService;
         this.pushService = pushService;
     }
-    // TODO implementar verificacao de preferencia de notificao do cliente e enviar baseado nisso
     @Override
     public Notificacao salvar(Notificacao notificacao) {
         log.info("Salvando notificação para destinatário {}: {}",
                 notificacao.getDestinatarioId(), notificacao.getTipoEvento());
 
-        // Salva a notificação no banco
         Notificacao notificacaoSalva = notificacaoRepository.save(notificacao);
 
-        // Busca preferência do usuário
         preferenciaRepository.findById(notificacao.getDestinatarioId())
                 .ifPresent(preferencia -> {
-                    // Envia conforme preferência do usuário
                     if (preferencia.getTipoPreferido() == TipoNotificacao.EMAIL ||
                             preferencia.getTipoPreferido() == TipoNotificacao.AMBOS) {
                         emailService.enviarEmail(

@@ -89,9 +89,10 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para Motorista
-    public Motorista criarMotorista(Motorista motorista) {
+    public UsuarioResponse criarMotorista(Motorista motorista) {
         motorista.setStatus("PARADO");
-        return motoristaRepository.save(motorista);
+        Motorista motoristaSalvo = motoristaRepository.save(motorista);
+        return converterParaUsuarioResponse(motoristaSalvo);
     }
 
     public Motorista atualizarMotorista(Long id, Motorista motoristaDetalhes) {
@@ -130,8 +131,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para OperadorLogistico
-    public OperadorLogistico criarOperador(OperadorLogistico operador) {
-        return operadorRepository.save(operador);
+    public UsuarioResponse criarOperador(OperadorLogistico operador) {
+        OperadorLogistico operadorSalvo = operadorRepository.save(operador);
+        return converterParaUsuarioResponse(operadorSalvo);
     }
 
     public OperadorLogistico atualizarOperador(Long id, OperadorLogistico operadorDetalhes) {

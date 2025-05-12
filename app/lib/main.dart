@@ -40,6 +40,9 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => notificationManager),
+        Provider(create: (_) => notificationService),
+        Provider(create: (_) => authService),
+        Provider(create: (_) => apiService),
       ],
       child: LogisticaApp(
         apiService: apiService,
@@ -137,7 +140,7 @@ class _LogisticaAppState extends State<LogisticaApp> {
     print("Building LogisticaApp - isLoggedIn: $_isLoggedIn");
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Logística App',
+      title: 'Logística',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
@@ -210,7 +213,7 @@ class SplashScreen extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              'Logística App',
+              'Logística',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
