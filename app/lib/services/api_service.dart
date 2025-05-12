@@ -400,4 +400,17 @@ class ApiService {
       return false;
     }
   }
+
+  Future<bool> hasOngoingOrder(int motoristaId) async {
+    try {
+      final pedidos = await getPedidosByMotorista(motoristaId);
+      return pedidos.any((pedido) =>
+      pedido.status == 'EM_ROTA' || pedido.status == 'AGUARDANDO_COLETA');
+    } catch (e) {
+      print('Erro ao verificar pedidos em andamento: $e');
+      return false;
+    }
+  }
+
+
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Notificacao {
   final int id;
   final String tipoEvento;
@@ -24,6 +26,8 @@ class Notificacao {
   });
 
   factory Notificacao.fromJson(Map<String, dynamic> json) {
+    String? payload = jsonEncode(json);
+
     return Notificacao(
       id: json['id'],
       tipoEvento: json['tipoEvento'] ?? '',
@@ -34,7 +38,7 @@ class Notificacao {
       dataCriacao: json['dataCriacao'] ?? DateTime.now().toIso8601String(),
       dataLeitura: json['dataLeitura'],
       lida: json['dataLeitura'] != null,
-      payload: json['payload'],
+      payload: payload,
     );
   }
 }
