@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/pedido.dart';
@@ -11,7 +13,7 @@ import '../services/notification_service.dart';
 import 'dialog/new_order_details_dialog.dart';
 import 'notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
-import 'package:geolocator/geolocator.dart';
+import 'order_tracking_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -596,7 +598,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 children: [
                   ElevatedButton.icon(
                     onPressed: () {
-                      // Implementar navegação para rota
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => OrderTrackingScreen(
+                            pedidoId: entrega.id,
+                            apiService: widget.apiService,
+                          ),
+                        ),
+                      );
                     },
                     icon: const Icon(Icons.map),
                     label: const Text('Iniciar Rota'),
@@ -622,46 +631,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  void _showUpdateStatusDialog(int entregaId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Atualizar Status da Entrega'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.local_shipping, color: Colors.blue),
-                title: const Text('Em Rota'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // Implementar atualização de status
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.check_circle, color: Colors.green),
-                title: const Text('Entregue'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // Implementar atualização de status
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.report_problem, color: Colors.orange),
-                title: const Text('Reportar Problema'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showReportProblemDialog(entregaId);
-                },
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
