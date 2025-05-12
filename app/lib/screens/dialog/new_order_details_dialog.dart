@@ -29,7 +29,21 @@ class _NewOrderDetailsDialogState extends State<NewOrderDetailsDialog> {
     });
 
     try {
-      // Obter localização atual
+      bool hasOngoing = await widget.apiService.hasOngoingOrder(widget.motoristaId);
+
+      if (hasOngoing) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Você já possui um pedido em andamento. Conclua-o antes de aceitar um novo.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -63,6 +77,7 @@ class _NewOrderDetailsDialogState extends State<NewOrderDetailsDialog> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -80,28 +80,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       await notificationManager.marcarComoLida(notificacao);
     }
 
-    print("Paylod da notifição recebida $notificacao.payload ");
+    print("Paylod da notifição recebida ${notificacao.payload} ");
 
-    if (notificacao.titulo == 'Novo pedido disponível' && notificacao.payload != null) {
+    if (notificacao.titulo.toLowerCase().contains("pedido dispon") && notificacao.payload != null) {
       try {
+        // Processar dados independentemente da estrutura
         final data = jsonDecode(notificacao.payload!);
-        if (data['tipoEvento'] == 'PEDIDO_DISPONIVEL' ||
-            (data['dadosEvento'] != null && data['dadosEvento']['evento'] == 'PEDIDO_DISPONIVEL')) {
 
-          final pedidoData = data['dadosEvento'] != null ?
-          data['dadosEvento']['dados'] :
-          data['dados'];
+        // Extrair os dados do pedido com tratamento para diferentes estruturas
+        Map<String, dynamic>? pedidoData;
 
-          if (pedidoData != null) {
-            showDialog(
+        // Tentar todas as estruturas possíveis
+        if (data['dadosEvento'] != null && data['dadosEvento']['dados'] != null) {
+          pedidoData = Map<String, dynamic>.from(data['dadosEvento']['dados']);
+        } else if (data['dados'] != null) {
+          pedidoData = Map<String, dynamic>.from(data['dados']);
+        }
+
+        // Mostrar o diálogo de aceitação
+        if (pedidoData != null) {
+          // IMPORTANTE: Uso do Navigator.of para garantir contexto correto
+          Navigator.of(context).push(
+            DialogRoute(
               context: context,
-              barrierDismissible: false,
-              builder: (context) => NewOrderDetailsDialog(
-                pedidoData: pedidoData,
+              builder: (dialogContext) => NewOrderDetailsDialog(
+                pedidoData: pedidoData!,
                 apiService: apiService,
                 motoristaId: authService.currentUser!.id,
                 onAccepted: () {
-                  Navigator.pop(context);
+                  Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Pedido aceito com sucesso!'),
@@ -110,16 +117,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   );
                 },
               ),
-            );
-            return;
-          }
+            ),
+          );
+          return;
         }
       } catch (e) {
-        print('Erro ao processar payload da notificação: $e');
+        print('Erro ao processar payload para diálogo: $e');
       }
     }
 
-    // Diálogo padrão para outras notificações
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -131,31 +137,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
-      ),
-    );
-  }
-
-// Novo método para mostrar o diálogo de pedido disponível
-  void _showPedidoDisponivel(BuildContext context, Map<String, dynamic> data) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final apiService = Provider.of<ApiService>(context, listen: false);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => NewOrderDetailsDialog(
-        pedidoData: data['dados'],
-        apiService: apiService,
-        motoristaId: authService.currentUser!.id,
-        onAccepted: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pedido aceito com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context); // Fechar o diálogo
-        },
       ),
     );
   }
