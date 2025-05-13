@@ -15,7 +15,7 @@ import 'dialog/new_order_details_dialog.dart';
 import 'notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
 import 'order_tracking_screen.dart';
-import 'dart:io';
+import '../services/location_update_service.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -37,6 +37,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _pushNotificationsEnabled = false;
   bool _emailNotificationsEnabled = false;
   late Future<List<Pedido>> _entregasAtivas;
+  late LocationUpdateService _locationUpdateService;
 
   @override
   void initState() {
@@ -45,13 +46,55 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _initializeLocationService();
     _setupNotificationHandling();
     _loadSettings();
-    _updateStatusBasedOnActiveDeliveries(); // Adicione esta linha
+
+    _locationUpdateService = LocationUpdateService(
+      apiService: widget.apiService,
+      driverId: widget.authService.currentUser!.id,
+    );
+
+    _locationUpdateService.setStatusCallback((newStatus) {
+      setState(() {
+        _currentStatus = newStatus;
+      });
+    });
+
+    _currentStatus = _locationUpdateService.lastSentStatus;
+
+    _startLocationUpdates();
+  }
+
+  void _startLocationUpdates() async {
+    int? activeOrderId = await _getActiveOrderId();
+    _locationUpdateService.startLocationUpdates(activeOrderId);
+  }
+
+  Future<int?> _getActiveOrderId() async {
+    try {
+      final entregas = await widget.apiService.getPedidosByMotorista(
+          widget.authService.currentUser!.id
+      );
+
+      final activeOrders = entregas.where((pedido) =>
+      pedido.status == 'EM_ROTA' || pedido.status == 'AGUARDANDO_COLETA'
+      ).toList();
+
+      return activeOrders.isNotEmpty ? activeOrders.first.id : null;
+    } catch (e) {
+      print('Error getting active order: $e');
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _locationUpdateService.stopLocationUpdates();
+    super.dispose();
   }
 
   void _loadEntregasAtivas() {
     final user = widget.authService.currentUser!;
     _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
-    _updateStatusBasedOnActiveDeliveries(); // Adicione esta linha
+    _updateStatusBasedOnActiveDeliveries();
   }
 
   Future<void> _loadSettings() async {
@@ -63,7 +106,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _emailNotificationsEnabled = prefs.getBool('emailNotifications') ?? false;
     });
 
-    // Carrega configurações do servidor, se necessário
+
     if (widget.authService.currentUser != null) {
       final userId = widget.authService.currentUser!.id;
       final apiPreferences = await widget.apiService.buscarPreferenciasNotificacao(userId);
@@ -88,7 +131,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final userId = widget.authService.currentUser!.id;
       final userEmail = widget.authService.currentUser!.email;
 
-      // Atualiza preferências no servidor
+
       await widget.apiService.atualizarPreferenciasNotificacao(
         userId,
         _emailNotificationsEnabled,
@@ -115,7 +158,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final notificationService = Provider.of<NotificationService>(context, listen: false);
 
     notificationService.setNotificationCallback((data) {
-      // Verificar diferentes estruturas possíveis
       if (data['tipoEvento'] == 'PEDIDO_DISPONIVEL' ||
           (data['dadosEvento'] != null && data['dadosEvento']['evento'] == 'PEDIDO_DISPONIVEL')) {
 
@@ -123,7 +165,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
     });
 
-    // Ajustar também o método que processa notificações quando o app é aberto por uma notificação
     FlutterLocalNotificationsPlugin().getNotificationAppLaunchDetails().then((details) {
       if (details != null && details.didNotificationLaunchApp &&
           details.notificationResponse?.payload != null) {
@@ -141,7 +182,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   void _showPedidoDisponivel(Map<String, dynamic> data) {
-    // Obter os dados do pedido da estrutura correta
     final pedidoData = data['dadosEvento'] != null ?
     data['dadosEvento']['dados'] :
     data['dados'];
@@ -183,7 +223,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     });
   }
 
-  Future<void> _logout() async {
+  Future _logout() async {
+    _locationUpdateService.stopLocationUpdates();
     await widget.authService.logout();
     if (context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
@@ -192,11 +233,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _updateDeliveryWithCamera(int pedidoId, String novoStatus) async {
     try {
-      // Abrir a câmera para tirar uma foto
       final ImagePicker _picker = ImagePicker();
       final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
 
-      // Se o usuário cancelou a captura da foto
       if (photo == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -209,26 +248,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return;
       }
 
-      // Se o status for para entregar o pedido
       if (novoStatus == 'ENTREGUE') {
-        // Mostrar indicador de carregamento
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => const Center(child: CircularProgressIndicator()),
         );
 
-        // Chamar a API para confirmar a entrega
         final success = await widget.apiService.confirmarEntrega(
             pedidoId,
             widget.authService.currentUser!.id
         );
 
-        // Fechar o diálogo de carregamento
         if (mounted) Navigator.pop(context);
 
         if (success && mounted) {
-          // Atualizar a lista de entregas
           setState(() {
             _loadEntregasAtivas();
           });
@@ -248,13 +282,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           );
         }
       }
-      // Se for outro status (como em rota), implemente a lógica correspondente
       else if (novoStatus == 'EM_ROTA') {
         // Implementação para atualizar para status EM_ROTA
         // Semelhante ao código acima, mas chamando o endpoint apropriado
       }
     } catch (e) {
-      // Fechar o diálogo de carregamento se estiver aberto
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -335,7 +367,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
         break;
       default:
-      // Para outros estados, usar o diálogo original
         showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -539,7 +570,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       default:
         statusColor = Colors.grey;
         statusIcon = Icons.help_outline;
-        statusText = 'Desconhecido';
+        statusText = 'Disponível';
     }
 
     return InkWell(
@@ -553,10 +584,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           const SizedBox(width: 4),
           Text(
-            'Status: $statusText',
+            'Status atual: $statusText',
             style: TextStyle(
               color: statusColor,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '',
+            style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+                fontStyle: FontStyle.italic
             ),
           ),
         ],
@@ -577,7 +617,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Substituir a linha atual por uma coluna
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -590,11 +629,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                _buildStatusIndicator(), // Novo método para indicador de status
+                _buildStatusIndicator(),
               ],
             ),
             const SizedBox(height: 24),
-            // Resto do código permanece igual
             const Text(
               'Entregas Atribuídas',
               style: TextStyle(
@@ -807,6 +845,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           _currentStatus = statusVeiculo;
         });
 
+        _locationUpdateService.setLastSentStatus(statusVeiculo);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Status atualizado para ${_formatStatus(statusVeiculo)}'),
@@ -815,7 +855,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
       }
     } catch (e) {
-      // Dismiss loading indicator if showing
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -835,7 +874,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       elevation: 2,
       child: InkWell(
         onTap: () {
-          // Implementar navegação para detalhes da entrega
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -887,7 +925,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         );
                       },
                       icon: const Icon(Icons.map),
-                      label: const Text('Iniciar Rota'),
+                      label: const Text('Ver Rota'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
@@ -923,7 +961,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Future<void> _aceitarPedido(int pedidoId) async {
+  Future _aceitarPedido(int pedidoId) async {
     try {
       final position = await _getCurrentLocation();
 
@@ -946,6 +984,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         setState(() {
           _loadEntregasAtivas();
         });
+
+        // Update the order ID in the location service
+        _locationUpdateService.updateOrderId(pedidoId);
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
