@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:app/models/notificacao.dart';
 import '../models/pedido.dart';
 import '../models/localizacao.dart';
 import '../models/user.dart';
 import 'database_service.dart';
+import 'dart:io';
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
 
@@ -473,6 +477,75 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Erro na requisição: $e');
+    }
+  }
+
+  Future confirmarEntrega(int pedidoId, int motoristaId) async {
+    final url = '$apiGatewayUrl/api/rastreamento/pedido/$pedidoId/entrega?motoristaId=$motoristaId';
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: _authHeaders,
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        _logError('confirmarEntrega', response);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Erro ao confirmar entrega: $e');
+      return false;
+    }
+  }
+
+  Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File foto) async {
+    try {
+      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/pedido/$pedidoId/coleta?motoristaId=$motoristaId');
+      var request = http.MultipartRequest('POST', uri);
+
+      // Adicionar headers de autenticação
+      _authHeaders.forEach((key, value) {
+        request.headers[key] = value;
+      });
+
+      var stream = http.ByteStream(foto.openRead());
+      var length = await foto.length();
+
+      var multipartFile = http.MultipartFile(
+          'foto',
+          stream,
+          length,
+          filename: 'coleta_$pedidoId.jpg',
+          contentType: MediaType('image', 'jpeg')
+      );
+
+      request.files.add(multipartFile);
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        _logError('confirmarColetaComFoto', response);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Erro ao confirmar coleta com foto: $e');
+      return false;
+    }
+  }
+
+  void _logError(String methodName, http.Response response) {
+    print('Error in $methodName: Status Code ${response.statusCode}');
+    if (response.body.isNotEmpty) {
+      try {
+        final errorData = jsonDecode(response.body);
+        print('Error details: $errorData');
+      } catch (e) {
+        print('Response body (not JSON): ${response.body}');
+      }
     }
   }
 }

@@ -15,6 +15,7 @@ import 'dialog/new_order_details_dialog.dart';
 import 'notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
 import 'order_tracking_screen.dart';
+import 'dart:io';
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -44,6 +45,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _initializeLocationService();
     _setupNotificationHandling();
     _loadSettings();
+    _updateStatusBasedOnActiveDeliveries(); // Adicione esta linha
+  }
+
+  void _loadEntregasAtivas() {
+    final user = widget.authService.currentUser!;
+    _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
+    _updateStatusBasedOnActiveDeliveries(); // Adicione esta linha
   }
 
   Future<void> _loadSettings() async {
@@ -88,11 +96,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         userEmail,
       );
     }
-  }
-
-  void _loadEntregasAtivas() {
-    final user = widget.authService.currentUser!;
-    _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
   }
 
   Future<void> _initializeLocationService() async {
@@ -187,91 +190,190 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  Future<void> _updateDeliveryWithCamera(int entregaId, String newStatus) async {
+  Future<void> _updateDeliveryWithCamera(int pedidoId, String novoStatus) async {
     try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
+      // Abrir a câmera para tirar uma foto
+      final ImagePicker _picker = ImagePicker();
+      final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
 
-      if (image == null) {
+      // Se o usuário cancelou a captura da foto
+      if (photo == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Operação cancelada. A foto não foi tirada.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
         return;
       }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
+      // Se o status for para entregar o pedido
+      if (novoStatus == 'ENTREGUE') {
+        // Mostrar indicador de carregamento
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
 
-      final success = await widget.apiService.updateDeliveryStatus(
-        entregaId,
-        newStatus,
-        imagePath: image.path,
-      );
+        // Chamar a API para confirmar a entrega
+        final success = await widget.apiService.confirmarEntrega(
+            pedidoId,
+            widget.authService.currentUser!.id
+        );
 
-      if (mounted) Navigator.pop(context);
+        // Fechar o diálogo de carregamento
+        if (mounted) Navigator.pop(context);
 
-      if (success && mounted) {
-        setState(() {
-          _loadEntregasAtivas();
-        });
+        if (success && mounted) {
+          // Atualizar a lista de entregas
+          setState(() {
+            _loadEntregasAtivas();
+          });
 
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Entrega confirmada com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Falha ao confirmar entrega. Por favor, tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      // Se for outro status (como em rota), implemente a lógica correspondente
+      else if (novoStatus == 'EM_ROTA') {
+        // Implementação para atualizar para status EM_ROTA
+        // Semelhante ao código acima, mas chamando o endpoint apropriado
+      }
+    } catch (e) {
+      // Fechar o diálogo de carregamento se estiver aberto
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Status atualizado para $newStatus com foto'),
-            backgroundColor: Colors.green,
+            content: Text('Erro ao processar operação: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao atualizar status: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
-  void _showUpdateStatusDialog(int entregaId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Atualizar Status da Entrega'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.local_shipping, color: Colors.blue),
-                title: const Text('Em Rota (com foto)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _updateDeliveryWithCamera(entregaId, 'EM_ROTA');
-                },
+  void _showUpdateStatusDialog(int entregaId, String status) {
+    switch (status) {
+      case 'AGUARDANDO_COLETA':
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Atualizar Status da Entrega'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.report_problem, color: Colors.orange),
+                    title: const Text('Relatar Incidente'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showReportProblemDialog(entregaId);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.local_shipping, color: Colors.blue),
+                    title: const Text('Coletar (com foto)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateDeliveryWithCamera(entregaId, 'EM_ROTA');
+                    },
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.check_circle, color: Colors.green),
-                title: const Text('Entregue (com foto)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _updateDeliveryWithCamera(entregaId, 'ENTREGUE');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.report_problem, color: Colors.orange),
-                title: const Text('Reportar Problema'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showReportProblemDialog(entregaId);
-                },
-              ),
-            ],
-          ),
+            );
+          },
         );
-      },
-    );
+        break;
+      case 'EM_ROTA':
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Atualizar Status da Entrega'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.report_problem, color: Colors.orange),
+                    title: const Text('Relatar Incidente'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showReportProblemDialog(entregaId);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.check_circle, color: Colors.green),
+                    title: const Text('Entregar (com foto)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateDeliveryWithCamera(entregaId, 'ENTREGUE');
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+        break;
+      default:
+      // Para outros estados, usar o diálogo original
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Atualizar Status da Entrega'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.local_shipping, color: Colors.blue),
+                    title: const Text('Em Rota (com foto)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateDeliveryWithCamera(entregaId, 'EM_ROTA');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.check_circle, color: Colors.green),
+                    title: const Text('Entregue (com foto)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateDeliveryWithCamera(entregaId, 'ENTREGUE');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.report_problem, color: Colors.orange),
+                    title: const Text('Reportar Problema'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showReportProblemDialog(entregaId);
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+    }
   }
 
   @override
@@ -339,6 +441,129 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
+  Future<void> _updateStatusBasedOnActiveDeliveries() async {
+    try {
+      final entregas = await widget.apiService.getPedidosByMotorista(widget.authService.currentUser!.id);
+      bool hasActiveDeliveries = entregas.any((pedido) =>
+      pedido.status == 'EM_ROTA' || pedido.status == 'AGUARDANDO_COLETA');
+
+      setState(() {
+        if (!hasActiveDeliveries) {
+          _currentStatus = 'DISPONIVEL';
+        }
+      });
+    } catch (e) {
+      print('Erro ao verificar pedidos ativos: $e');
+    }
+  }
+
+  void _showStatusDialogForActiveDeliveries() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Atualizar Status'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.directions_car, color: Colors.blue),
+                title: const Text('Em Movimento'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateDriverStatus("EM_MOVIMENTO");
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.pause_circle_filled, color: Colors.orange),
+                title: const Text('Parado'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateDriverStatus("PARADO");
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _maybeShowStatusUpdateDialog() async {
+    try {
+      final entregas = await widget.apiService.getPedidosByMotorista(widget.authService.currentUser!.id);
+      bool hasActiveDeliveries = entregas.any((pedido) =>
+      pedido.status == 'EM_ROTA' || pedido.status == 'AGUARDANDO_COLETA');
+
+      if (hasActiveDeliveries) {
+        _showStatusDialogForActiveDeliveries();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Você está disponível. O status só pode ser alterado quando houver entregas ativas.'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao verificar entregas: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildStatusIndicator() {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (_currentStatus) {
+      case 'DISPONIVEL':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusText = 'Disponível';
+        break;
+      case 'EM_MOVIMENTO':
+        statusColor = Colors.blue;
+        statusIcon = Icons.directions_car;
+        statusText = 'Em Movimento';
+        break;
+      case 'PARADO':
+        statusColor = Colors.orange;
+        statusIcon = Icons.pause_circle_filled;
+        statusText = 'Parado';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help_outline;
+        statusText = 'Desconhecido';
+    }
+
+    return InkWell(
+      onTap: () => _maybeShowStatusUpdateDialog(),
+      child: Row(
+        children: [
+          Icon(
+            statusIcon,
+            color: statusColor,
+            size: 16,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Status: $statusText',
+            style: TextStyle(
+              color: statusColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDashboard(int motoristId) {
     return RefreshIndicator(
       onRefresh: () async {
@@ -352,23 +577,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Substituir a linha atual por uma coluna
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Text(
-                    'Olá, ${widget.authService.currentUser!.name}!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  'Olá, ${widget.authService.currentUser!.name}!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                _buildStatusButton(),
+                const SizedBox(height: 4),
+                _buildStatusIndicator(), // Novo método para indicador de status
               ],
             ),
             const SizedBox(height: 24),
+            // Resto do código permanece igual
             const Text(
               'Entregas Atribuídas',
               style: TextStyle(
@@ -648,35 +874,46 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => OrderTrackingScreen(
-                            pedidoId: entrega.id,
-                            apiService: widget.apiService,
+                  if (entrega.status != 'ENTREGUE') // Só mostra o botão de rota se não estiver entregue
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => OrderTrackingScreen(
+                              pedidoId: entrega.id,
+                              apiService: widget.apiService,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.map),
-                    label: const Text('Iniciar Rota'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                        );
+                      },
+                      icon: const Icon(Icons.map),
+                      label: const Text('Iniciar Rota'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showUpdateStatusDialog(entrega.id);
-                    },
-                    icon: const Icon(Icons.update),
-                    label: const Text('Atualizar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
+                  // Botão condicional baseado no status
+                  if (entrega.status == 'EM_PROCESSAMENTO')
+                    ElevatedButton.icon(
+                      onPressed: () => _aceitarPedido(entrega.id),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Aceitar Pedido'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    )
+                  else if (entrega.status != 'ENTREGUE')
+                    ElevatedButton.icon(
+                      onPressed: () => _showUpdateStatusDialog(entrega.id, entrega.status),
+                      icon: const Icon(Icons.update),
+                      label: const Text('Atualizar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -684,6 +921,51 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _aceitarPedido(int pedidoId) async {
+    try {
+      final position = await _getCurrentLocation();
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final success = await widget.apiService.aceitarPedido(
+          pedidoId,
+          widget.authService.currentUser!.id,
+          position.latitude,
+          position.longitude
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      if (success && mounted) {
+        setState(() {
+          _loadEntregasAtivas();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido aceito com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao aceitar pedido: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showReportProblemDialog(int entregaId) {
