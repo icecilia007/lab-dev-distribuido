@@ -545,4 +545,25 @@ class ApiService {
       }
     }
   }
+
+  Future<Map<String, dynamic>> getDriverStatistics(
+      int driverId,
+      String dataInicio,
+      String dataFim
+      ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$apiGatewayUrl/api/rastreamento/estatisticas/motorista/$driverId?dataInicio=$dataInicio&dataFim=$dataFim'),
+        headers: _authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Falha ao buscar estatísticas: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro na requisição: $e');
+    }
+  }
 }
