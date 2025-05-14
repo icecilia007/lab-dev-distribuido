@@ -1,0 +1,100 @@
+{
+  "rabbit_version": "3.9",
+  "users": [
+    {
+      "name": "guest",
+      "password_hash": "BMfxN8drrYcIqXZMr+pWTpDT0nMcOagMduLX0bjr4jwud/pN",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "logistica.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "usuario.motorista.status",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "pedidos.geral",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "rastreamento.incidentes",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notificacoes.geral",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "logistica.exchange",
+      "vhost": "/",
+      "destination": "usuario.motorista.status",
+      "destination_type": "queue",
+      "routing_key": "motorista.status.#",
+      "arguments": {}
+    },
+    {
+      "source": "logistica.exchange",
+      "vhost": "/",
+      "destination": "pedidos.geral",
+      "destination_type": "queue",
+      "routing_key": "pedidos.#",
+      "arguments": {}
+    },
+    {
+      "source": "logistica.exchange",
+      "vhost": "/",
+      "destination": "rastreamento.incidentes",
+      "destination_type": "queue",
+      "routing_key": "incidentes.#",
+      "arguments": {}
+    },
+    {
+      "source": "logistica.exchange",
+      "vhost": "/",
+      "destination": "notificacoes.geral",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    }
+  ]
+}

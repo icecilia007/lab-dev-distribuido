@@ -1,0 +1,41 @@
+server:
+  port: 8081
+  address: 127.0.0.1  # Aceita apenas conexões locais (mesmo host)
+  # OU address: 192.168.1.100  # Aceita apenas conexões do endereço IP específico da rede interna
+security:
+  internal:
+    header-name: X-Internal-Auth
+    header-value: 2BE2AB6217329B86A427A3819B626
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/main_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+rabbitmq:
+  exchange: logistica.exchange
+
+# Configurações para serviços externos
+services:
+  usuario:
+    url: "http://localhost:8080"
+  rastreamento:
+    url: "http://localhost:8082"
+  osrm:
+    base-url: "http://router.project-osrm.org"
+
+logging:
+  level:
+    com.logistica.pedidos: DEBUG
+    org.springframework.amqp: INFO
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
