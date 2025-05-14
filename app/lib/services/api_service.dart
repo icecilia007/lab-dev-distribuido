@@ -499,40 +499,37 @@ class ApiService {
     }
   }
 
-  Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File foto) async {
+  Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File fotoColeta) async {
     try {
       var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/pedido/$pedidoId/coleta?motoristaId=$motoristaId');
       var request = http.MultipartRequest('POST', uri);
 
-      // Adicionar headers de autenticação
       _authHeaders.forEach((key, value) {
         request.headers[key] = value;
       });
 
-      var stream = http.ByteStream(foto.openRead());
-      var length = await foto.length();
-
-      var multipartFile = http.MultipartFile(
+      if (fotoColeta.existsSync()) {
+        final foto = await http.MultipartFile.fromPath(
           'foto',
-          stream,
-          length,
-          filename: 'coleta_$pedidoId.jpg',
-          contentType: MediaType('image', 'jpeg')
-      );
+          fotoColeta.path,
+          contentType: MediaType('image', 'jpeg'),
+        );
+        request.files.add(foto);
+      }
 
-      request.files.add(multipartFile);
-
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final responseData = json.decode(response.body);
+        return responseData == true;
+        print('true');
       } else {
-        _logError('confirmarColetaComFoto', response);
+        print('Erro ao confirmar coleta: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      debugPrint('Erro ao confirmar coleta com foto: $e');
+      print('Exceção ao confirmar coleta: $e');
       return false;
     }
   }
