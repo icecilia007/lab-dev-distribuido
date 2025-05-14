@@ -566,4 +566,40 @@ class ApiService {
       throw Exception('Erro na requisição: $e');
     }
   }
+
+  Future<Map<String, dynamic>?> reportarIncidente(
+      int motoristaId,
+      double latitude,
+      double longitude,
+      String tipo,
+      String descricao,
+      double raioImpactoKm,
+      int duracaoHoras
+      ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiGatewayUrl/api/incidentes'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'motoristaId': motoristaId,
+          'latitude': latitude,
+          'longitude': longitude,
+          'tipo': tipo,
+          'descricao': descricao,
+          'raioImpactoKm': raioImpactoKm,
+          'duracaoHoras': duracaoHoras
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        print('Erro ao reportar incidente: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exceção ao reportar incidente: $e');
+      return null;
+    }
+  }
 }

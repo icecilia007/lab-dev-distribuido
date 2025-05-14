@@ -74,6 +74,15 @@ public class GatewayConfig {
                         )
                         .uri(rastreamentoServiceUrl))
 
+                // Serviço de Incidentes
+                .route("incidente-service", r -> r
+                        .path("/api/incidentes/**")
+                        .filters(f -> f
+                                .filter(rateLimiter)
+                                .filter(cacheFilter)
+                        )
+                        .uri(rastreamentoServiceUrl))
+
                 // Serviço de Notificações
                 .route("notificacao-service", r -> r
                         .path("/api/notificacoes/**")
