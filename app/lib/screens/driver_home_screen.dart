@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
@@ -264,6 +265,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return;
       }
 
+      await Future.delayed(Duration(milliseconds: 100));
+
       if (novoStatus == 'ENTREGUE') {
         showDialog(
           context: context,
@@ -299,8 +302,42 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         }
       }
       else if (novoStatus == 'EM_ROTA') {
-        // Implementação para atualizar para status EM_ROTA
-        // Semelhante ao código acima, mas chamando o endpoint apropriado
+        // Implementação para confirmação de coleta
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+
+        print('Iniciando confirmação de coleta para pedido $pedidoId');
+        final success = await widget.apiService.confirmarColetaComFoto(
+          pedidoId,
+          widget.authService.currentUser!.id,
+          File(photo.path),
+        );
+
+        if (mounted) Navigator.pop(context);
+
+        if (success && mounted) {
+          setState(() {
+            _loadEntregasAtivas();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Coleta confirmada com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          print('Coleta confirmada com sucesso para pedido $pedidoId');
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Falha ao confirmar coleta. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          print('Falha na confirmação de coleta para pedido $pedidoId');
+        }
       }
     } catch (e) {
       if (mounted && Navigator.canPop(context)) {
