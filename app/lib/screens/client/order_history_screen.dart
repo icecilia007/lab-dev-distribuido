@@ -1,9 +1,9 @@
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import '../models/pedido.dart';
-import '../services/api_service.dart';
-import 'order_tracking_screen.dart';
+import '../../models/pedido.dart';
+import '../../services/api_service.dart';
+import '../order_tracking_screen.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   final int userId;

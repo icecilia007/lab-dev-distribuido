@@ -6,18 +6,18 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/pedido.dart';
-import '../services/api_service.dart';
-import '../services/auth_service.dart';
-import '../services/location_service.dart';
-import '../services/notification_manager.dart';
-import '../services/notification_service.dart';
-import 'dialog/new_order_details_dialog.dart';
+import '../../models/pedido.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
+import '../../manager/notification_manager.dart';
+import '../../services/notification_service.dart';
+import '../dialog/new_order_details_dialog.dart';
 import 'driver_statistics_screen.dart';
-import 'notifications_screen.dart';
+import '../notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
-import 'order_tracking_screen.dart';
-import '../services/location_update_service.dart';
+import '../order_tracking_screen.dart';
+import '../../services/location_update_service.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final AuthService authService;

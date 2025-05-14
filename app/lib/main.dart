@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/notificacao.dart';
-import 'package:app/services/notification_manager.dart';
+import 'package:app/manager/notification_manager.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/new_order_screen.dart';
+import 'screens/client/home_screen.dart';
+import 'screens/client/new_order_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
-import 'screens/driver_home_screen.dart';
+import 'screens/driver/driver_home_screen.dart';
 
 
 void main() async {
