@@ -26,6 +26,11 @@ cd lab-dev-distribuido/infra
 ```
 - Abra os arquivos yml da pasta ``database`` e ``rabbitmq`` e execute-os pelo IntelliJ Idea
 
+Para visualizar o banco de dados, rode o seguinte comando no terminal com permissões de administrador.
+```bash
+docker exec -it postgres-db psql -U postgres -d main_db
+```
+
 ## Configuração do Ambiente de Desenvolvimento
 
 ### 1. Instalação do JDK 21
