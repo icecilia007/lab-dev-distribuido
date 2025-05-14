@@ -91,6 +91,10 @@ class _LogisticaAppState extends State<LogisticaApp> {
       _isLoggedIn = success;
       _isInitialized = true;
       _userType = userType;
+
+      if (_isLoggedIn && widget.authService.currentUser != null) {
+        _connectToWebSocket();
+      }
     });
   }
 
