@@ -32,8 +32,8 @@ public class UsuarioController {
     }
     // Endpoints para Cliente
     @PostMapping("/clientes")
-    public ResponseEntity<Cliente> criarCliente(@RequestBody Cliente cliente) {
-        Cliente novoCliente = usuarioService.criarCliente(cliente);
+    public ResponseEntity<UsuarioResponse> criarCliente(@RequestBody Cliente cliente) {
+        var novoCliente = usuarioService.criarCliente(cliente);
         return new ResponseEntity<>(novoCliente, HttpStatus.CREATED);
     }
 
@@ -63,8 +63,8 @@ public class UsuarioController {
 
     // Endpoints para Motoristas
     @PostMapping("/motoristas")
-    public ResponseEntity<Motorista> criarMotorista(@RequestBody Motorista motorista) {
-        Motorista novoMotorista = usuarioService.criarMotorista(motorista);
+    public ResponseEntity<UsuarioResponse> criarMotorista(@RequestBody Motorista motorista) {
+        var novoMotorista = usuarioService.criarMotorista(motorista);
         return new ResponseEntity<>(novoMotorista, HttpStatus.CREATED);
     }
 
@@ -100,8 +100,8 @@ public class UsuarioController {
 
     // Endpoints para Operadores Logísticos
     @PostMapping("/operadores")
-    public ResponseEntity<OperadorLogistico> criarOperador(@RequestBody OperadorLogistico operador) {
-        OperadorLogistico novoOperador = usuarioService.criarOperador(operador);
+    public ResponseEntity<UsuarioResponse> criarOperador(@RequestBody OperadorLogistico operador) {
+        var novoOperador = usuarioService.criarOperador(operador);
         return new ResponseEntity<>(novoOperador, HttpStatus.CREATED);
     }
 

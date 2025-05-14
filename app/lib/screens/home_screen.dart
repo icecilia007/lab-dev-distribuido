@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_manager.dart';
 import 'new_order_screen.dart';
+import 'notifications_screen.dart';
 import 'order_tracking_screen.dart';
 import 'order_history_screen.dart';
 import 'settings_screen.dart';
+import 'package:badges/badges.dart' as badges;
+
 
 class HomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -33,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadPedidosAtivos() {
     final user = widget.authService.currentUser!;
-    _pedidosAtivos = widget.apiService.getPedidosByCliente(user.id);
+    _pedidosAtivos = widget.apiService.getPedidosByCliente(user.id,user.type.toLowerCase() );
   }
 
   void _onItemTapped(int index) {
@@ -58,14 +63,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final List<Widget> _widgetOptions = <Widget>[
       _buildDashboard(user.id),
-      OrderHistoryScreen(userId: user.id, apiService: widget.apiService),
-      SettingsScreen(onLogout: _logout),
+      OrderHistoryScreen(userId: user.id, apiService: widget.apiService,userType: user.type,),
+      SettingsScreen(onLogout: _logout, authService: widget.authService, apiService: widget.apiService,),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logística App'),
+        title: const Text('Logística'),
         actions: [
+          Consumer<NotificationManager>(
+            builder: (context, notificationManager, child) {
+              return badges.Badge(
+                position: badges.BadgePosition.topEnd(top: 5, end: 5),
+                showBadge: notificationManager.unreadCount > 0,
+                badgeContent: Text(
+                  notificationManager.unreadCount.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.exit_to_app),
             onPressed: _logout,
@@ -108,36 +136,40 @@ class _HomeScreenState extends State<HomeScreen> {
     child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-    Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-    Text(
-    'Olá, ${widget.authService.currentUser!.name}!',
-    style: const TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    ),
-    ),
-      ElevatedButton.icon(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => NewOrderScreen(
-                apiService: widget.apiService,
-                authService: widget.authService,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Olá, ${widget.authService.currentUser!.name}!',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8), // Add spacing between name and button
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => NewOrderScreen(
+                      apiService: widget.apiService,
+                      authService: widget.authService,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Novo Pedido'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
               ),
             ),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Novo Pedido'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
+          ),
+        ],
       ),
-    ],
-    ),
       const SizedBox(height: 24),
       const Text(
         'Pedidos Ativos',

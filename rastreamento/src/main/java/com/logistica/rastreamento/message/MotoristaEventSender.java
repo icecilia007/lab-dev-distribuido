@@ -20,13 +20,11 @@ public class MotoristaEventSender {
 
     private static final Logger logger = LoggerFactory.getLogger(MotoristaEventSender.class);
     private final RabbitTemplate rabbitTemplate;
-    private final ObjectMapper objectMapper;
     @Value("${rabbitmq.exchange}")
     private String exchange;
 
-    public MotoristaEventSender(RabbitTemplate rabbitTemplate, ObjectMapper objectMapper) {
+    public MotoristaEventSender(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
-        this.objectMapper = objectMapper;
     }
 
     public void enviarNotificacaoStatusMotorista(Long idMotorista, StatusVeiculo status) {

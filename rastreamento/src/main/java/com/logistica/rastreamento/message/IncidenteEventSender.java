@@ -21,49 +21,21 @@ public class IncidenteEventSender {
 
     private static final Logger logger = LoggerFactory.getLogger(IncidenteEventSender.class);
     private final RabbitTemplate rabbitTemplate;
-    private final ObjectMapper objectMapper;
     @Value("${rabbitmq.exchange}")
     private String exchange;
 
-    public IncidenteEventSender(RabbitTemplate rabbitTemplate, ObjectMapper objectMapper) {
+    public IncidenteEventSender(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
-        this.objectMapper = objectMapper;
     }
 
     public void enviarNotificacaoIncidenteReportado(Incidente incidente, List<LocalizacaoDTO> motoristasProximos) {
         logger.debug("Enviando notificação de incidente reportado: {}", incidente);
 
         try {
-            // Notificação geral do incidente
-            Map<String, Object> mensagem = new HashMap<>();
-            mensagem.put("evento", "INCIDENTE_REPORTADO");
-            mensagem.put("origem", "RASTREAMENTO_SERVICE");
-            mensagem.put("timestamp", Instant.now().toString());
-
-            Map<String, Object> dados = new HashMap<>();
-            dados.put("incidenteId", incidente.getId());
-            dados.put("motoristaId", incidente.getMotoristaId());
-            dados.put("tipo", incidente.getTipo().name());
-            dados.put("latitude", incidente.getLatitude());
-            dados.put("longitude", incidente.getLongitude());
-            dados.put("dataReporte", incidente.getDataReporte());
-            dados.put("dataExpiracao", incidente.getDataExpiracao());
-            dados.put("raioImpactoKm", incidente.getRaioImpactoKm());
-
-            // IDs dos motoristas próximos
-            dados.put("motoristasANotificar",
-                    motoristasProximos.stream()
-                            .map(LocalizacaoDTO::getMotoristaId)
-                            .toList());
-
-            mensagem.put("dados", dados);
-
-            String routingKey = "incidentes.incidente.reportado." + incidente.getTipo().name().toLowerCase();
-            String mensagemJson = objectMapper.writeValueAsString(mensagem);
-            rabbitTemplate.convertAndSend(exchange, routingKey, mensagemJson);
-
-            // Notificações individuais para cada motorista próximo
-            for (LocalizacaoDTO motorista : motoristasProximos) {
+            var motoristasANotificacar = motoristasProximos.stream()
+                    .filter(distinctByKey(LocalizacaoDTO::getMotoristaId))
+                    .toList();
+            for (LocalizacaoDTO motorista : motoristasANotificacar) {
                 Map<String, Object> notificacaoIndividual = new HashMap<>();
                 notificacaoIndividual.put("evento", "ALERTA_INCIDENTE");
                 notificacaoIndividual.put("origem", "RASTREAMENTO_SERVICE");
@@ -88,4 +60,9 @@ public class IncidenteEventSender {
             logger.error("Erro ao enviar notificação de incidente: {}", e.getMessage());
         }
     }
+    private static <T> java.util.function.Predicate<T> distinctByKey(java.util.function.Function<? super T, ?> keyExtractor) {
+        java.util.Set<Object> seen = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        return t -> seen.add(keyExtractor.apply(t));
+    }
+
 }

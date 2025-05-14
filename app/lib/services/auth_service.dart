@@ -21,8 +21,10 @@ class AuthService {
       await prefs.setString('userName', user.name);
       await prefs.setString('userEmail', user.email);
       await prefs.setString('userType', user.type);
+      if (user.phone != null) {
+        await prefs.setString('userPhone', user.phone!);
+      }
 
-      // Salvar o token de autenticação
       if (_apiService.authToken != null) {
         await prefs.setString('authToken', _apiService.authToken!);
       }
@@ -37,37 +39,38 @@ class AuthService {
   Future<void> logout() async {
     print("Realizando logout e limpando token: ${_apiService.authToken}");
     _currentUser = null;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userId');
     await prefs.remove('userName');
     await prefs.remove('userEmail');
     await prefs.remove('userType');
+    await prefs.remove('userPhone');
     await prefs.remove('authToken');
 
     _apiService.authToken = null;
     print("Token após logout: ${_apiService.authToken}");
   }
 
-  Future<bool> autoLogin() async {
+  Future<Map<String, dynamic>> autoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
     final authToken = prefs.getString('authToken');
+    final userType = prefs.getString('userType');
 
     if (userId == null || authToken == null) {
-      return false;
+      return {'success': false, 'userType': null};
     }
 
     _currentUser = User(
       id: userId,
       name: prefs.getString('userName') ?? '',
       email: prefs.getString('userEmail') ?? '',
-      type: prefs.getString('userType') ?? '',
+      type: userType ?? '',
+      phone: prefs.getString('userPhone'),
     );
 
     _apiService.authToken = authToken;
-
-    return true;
+    return {'success': true, 'userType': userType};
   }
 
   bool get isAuthenticated => _currentUser != null && _apiService.authToken != null;
