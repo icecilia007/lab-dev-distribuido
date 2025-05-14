@@ -2,12 +2,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onLogout;
+  final AuthService authService;
+  final ApiService apiService;
 
   const SettingsScreen({
     Key? key,
     required this.onLogout,
+    required this.authService,
+    required this.apiService,
   }) : super(key: key);
 
   @override
@@ -16,8 +23,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isDarkMode = false;
-  bool _pushNotificationsEnabled = true;
-  bool _emailNotificationsEnabled = true;
+  bool _pushNotificationsEnabled = false;
+  bool _emailNotificationsEnabled = false;
   bool _isLoading = true;
 
   @override
@@ -29,22 +36,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
+    if (widget.authService.currentUser != null) {
+      final userId = widget.authService.currentUser!.id;
+      final apiPreferences = await widget.apiService.buscarPreferenciasNotificacao(userId);
+
+      if (apiPreferences != null) {
+        final tipoPreferido = apiPreferences['tipoPreferido'] as String;
+        setState(() {
+          _pushNotificationsEnabled = tipoPreferido == 'PUSH' || tipoPreferido == 'AMBOS';
+          _emailNotificationsEnabled = tipoPreferido == 'EMAIL' || tipoPreferido == 'AMBOS';
+        });
+      }
+    }
+
     setState(() {
       _isDarkMode = prefs.getBool('darkMode') ?? false;
-      _pushNotificationsEnabled = prefs.getBool('pushNotifications') ?? true;
-      _emailNotificationsEnabled = prefs.getBool('emailNotifications') ?? true;
+      if (widget.authService.currentUser == null) {
+        _pushNotificationsEnabled = prefs.getBool('pushNotifications') ?? false;
+        _emailNotificationsEnabled = prefs.getBool('emailNotifications') ?? false;
+      }
       _isLoading = false;
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
-
     await prefs.setBool('darkMode', _isDarkMode);
     await prefs.setBool('pushNotifications', _pushNotificationsEnabled);
     await prefs.setBool('emailNotifications', _emailNotificationsEnabled);
 
-    // TODO: Aplicar mudanças de tema
+    if (widget.authService.currentUser != null) {
+      final userId = widget.authService.currentUser!.id;
+      final userEmail = widget.authService.currentUser!.email;
+
+      await widget.apiService.atualizarPreferenciasNotificacao(
+        userId,
+        _emailNotificationsEnabled,
+        _pushNotificationsEnabled,
+        userEmail,
+      );
+    }
   }
 
   @override
@@ -87,8 +118,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _pushNotificationsEnabled = value;
               });
               _saveSettings();
-
-              // TODO: Tratar permissão de notificação push
             },
           ),
           SwitchListTile(
@@ -112,14 +141,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Termos de Uso'),
             trailing: const Icon(Icons.keyboard_arrow_right),
             onTap: () {
-              // TODO: Navegar para termos de uso
             },
           ),
           ListTile(
             title: const Text('Política de Privacidade'),
             trailing: const Icon(Icons.keyboard_arrow_right),
             onTap: () {
-              // TODO: Navegar para política de privacidade
             },
           ),
           const SizedBox(height: 24),

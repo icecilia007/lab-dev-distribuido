@@ -37,9 +37,30 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para Cliente
-    public Cliente criarCliente(Cliente cliente) {
-        return clienteRepository.save(cliente);
+    private UsuarioResponse converterParaUsuarioResponse(Usuario usuario) {
+        String tipo = "";
+        if (usuario instanceof Cliente) {
+            tipo = "CLIENTE";
+        } else if (usuario instanceof Motorista) {
+            tipo = "MOTORISTA";
+        } else if (usuario instanceof OperadorLogistico) {
+            tipo = "OPERADOR";
+        }
+
+        return new UsuarioResponse(
+                usuario.getId(),
+                usuario.getNome(),
+                usuario.getEmail(),
+                tipo,
+                usuario.getTelefone()
+        );
     }
+
+    public UsuarioResponse criarCliente(Cliente cliente) {
+        Cliente clienteSalvo = clienteRepository.save(cliente);
+        return converterParaUsuarioResponse(clienteSalvo);
+    }
+
 
     public Cliente atualizarCliente(Long id, Cliente clienteDetalhes) {
         Cliente cliente = clienteRepository.findById(id)
@@ -68,9 +89,10 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para Motorista
-    public Motorista criarMotorista(Motorista motorista) {
+    public UsuarioResponse criarMotorista(Motorista motorista) {
         motorista.setStatus("PARADO");
-        return motoristaRepository.save(motorista);
+        Motorista motoristaSalvo = motoristaRepository.save(motorista);
+        return converterParaUsuarioResponse(motoristaSalvo);
     }
 
     public Motorista atualizarMotorista(Long id, Motorista motoristaDetalhes) {
@@ -109,8 +131,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     // Métodos para OperadorLogistico
-    public OperadorLogistico criarOperador(OperadorLogistico operador) {
-        return operadorRepository.save(operador);
+    public UsuarioResponse criarOperador(OperadorLogistico operador) {
+        OperadorLogistico operadorSalvo = operadorRepository.save(operador);
+        return converterParaUsuarioResponse(operadorSalvo);
     }
 
     public OperadorLogistico atualizarOperador(Long id, OperadorLogistico operadorDetalhes) {

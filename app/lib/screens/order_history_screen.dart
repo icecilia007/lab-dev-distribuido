@@ -1,4 +1,5 @@
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../models/pedido.dart';
 import '../services/api_service.dart';
@@ -6,12 +7,14 @@ import 'order_tracking_screen.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   final int userId;
+  final String userType;
   final ApiService apiService;
 
   const OrderHistoryScreen({
     Key? key,
     required this.userId,
     required this.apiService,
+    required this.userType,
   }) : super(key: key);
 
   @override
@@ -21,38 +24,82 @@ class OrderHistoryScreen extends StatefulWidget {
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   late Future<List<Pedido>> _pedidos;
   String _filterStatus = 'TODOS';
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
+    _checkConnectivity();
     _loadPedidos();
   }
 
+  Future<void> _checkConnectivity() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    setState(() {
+      _isOffline = connectivityResult == ConnectivityResult.none;
+    });
+  }
+
   void _loadPedidos() {
-    _pedidos = widget.apiService.getPedidosByCliente(widget.userId);
+    _pedidos = widget.apiService.getPedidosByCliente(widget.userId,widget.userType);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Histórico de Pedidos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Histórico de Pedidos',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_isOffline)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.cloud_off, color: Colors.white, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Offline',
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildFilterChips(),
-            ],
+                if (_isOffline)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Mostrando apenas pedidos entregues armazenados localmente',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                _buildFilterChips(),
+              ],
+            ),
           ),
-        ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
@@ -113,11 +160,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   );
                 } else {
-                  final filteredPedidos = _filterStatus == 'TODOS'
-                      ? snapshot.data!
-                      : snapshot.data!
-                      .where((pedido) => pedido.status == _filterStatus)
-                      .toList();
+                  final filteredPedidos = _isOffline
+                    ? snapshot.data!.where((pedido) => pedido.status == 'ENTREGUE').toList()
+                    : _filterStatus == 'TODOS'
+                        ? snapshot.data!
+                        : snapshot.data!.where((pedido) => pedido.status == _filterStatus).toList();
 
                   if (filteredPedidos.isEmpty) {
                     return const Center(
@@ -158,6 +205,24 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   Widget _buildFilterChips() {
+    if (_isOffline) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            FilterChip(
+              selected: true,
+              label: const Text('Entregue'),
+              onSelected: (_) {}, // Desabilitado
+              backgroundColor: Colors.grey[200],
+              selectedColor: Colors.blue,
+              labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+    // Caso contrário, mostrar todos os filtros
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(

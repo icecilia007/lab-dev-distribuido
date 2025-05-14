@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioService {
-    Cliente criarCliente(Cliente cliente);
+    UsuarioResponse criarCliente(Cliente cliente);
 
     List<Cliente> buscarTodosClientes();
 
@@ -21,7 +21,7 @@ public interface UsuarioService {
 
     void deletarCliente(Long id);
 
-    Motorista criarMotorista(Motorista motorista);
+    UsuarioResponse criarMotorista(Motorista motorista);
 
     List<Motorista> buscarTodosMotoristas();
 
@@ -33,7 +33,7 @@ public interface UsuarioService {
 
     void deletarMotorista(Long id);
 
-    OperadorLogistico criarOperador(OperadorLogistico operador);
+    UsuarioResponse criarOperador(OperadorLogistico operador);
 
     List<OperadorLogistico> buscarTodosOperadores();
 

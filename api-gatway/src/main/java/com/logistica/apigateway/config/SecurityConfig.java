@@ -29,10 +29,11 @@ public class SecurityConfig {
         return List.of(
                 "/api/auth/login",
                 "/api/auth/registro/**",
-                "/actuator/**",
-                "/swagger-ui/**",
+                "/api/auth/registro",
+                "/actuator/",
+                "/swagger-ui/",
                 "/swagger-ui.html",
-                "/api-docs/**",
+                "/api-docs/",
                 "/api-docs",
                 "/api-docs**",
                 "/swagger-resources/**",
@@ -56,7 +57,6 @@ public class SecurityConfig {
 
         log.info("Configurando cadeia de filtros de segurança com JWT");
 
-        // Converter o GlobalFilter para WebFilter para usar no Spring Security
         WebFilter jwtFilter = (exchange, chain) -> {
             log.debug("Aplicando JwtAuthenticationFilter através do WebFilter");
             return jwtAuthenticationFilter.filter(exchange, new GatewayFilterChain() {

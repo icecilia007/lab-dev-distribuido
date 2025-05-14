@@ -53,7 +53,6 @@ class _LoginScreenState extends State<LoginScreen> {
         print("Login resultado: $success");
         if (success) {
           print("Login bem-sucedido, executando callback...");
-          Navigator.of(context).pushReplacementNamed('/home');
           widget.onLoginSuccess();
         } else {
           setState(() {
@@ -77,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Logística App',
+                      'Logística',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 28,

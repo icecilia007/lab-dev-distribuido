@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  http_parser: ^4.0.2
   flutter:
     sdk: flutter
   http: ^1.2.2
@@ -36,15 +37,19 @@ dependencies:
   camera: ^0.11.0+2
   shared_preferences: ^2.2.2
   sqflite: ^2.3.0
+  connectivity_plus: ^5.0.1
   path_provider: ^2.1.1
+  image_picker: ^1.0.4
   path: ^1.8.3
   geolocator: ^12.0.0
-  # google_maps_flutter: ^2.5.0 # Removido
-  flutter_map: ^6.0.0  # Adicionado para substituir o Google Maps
-  latlong2: ^0.9.0     # Necessário para o flutter_map
+  flutter_map: ^6.0.0
+  latlong2: ^0.9.0
   flutter_local_notifications: ^18.0.1
+  badges: ^3.1.1
+  web_socket_channel: ^2.4.0
   provider: ^6.0.5
   intl: ^0.18.1
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
