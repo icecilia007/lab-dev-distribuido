@@ -91,10 +91,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     super.dispose();
   }
 
-  void _loadEntregasAtivas() {
+  Future<void> _loadEntregasAtivas() async {
     final user = widget.authService.currentUser!;
-    _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
-    _updateStatusBasedOnActiveDeliveries();
+    setState(() {
+      _entregasAtivas = widget.apiService.getPedidosByMotorista(user.id);
+    });
+
+    try {
+      final entregas = await _entregasAtivas;
+
+      bool hasActiveDeliveries = entregas.any((pedido) =>
+      pedido.status == 'EM_ROTA' || pedido.status == 'AGUARDANDO_COLETA');
+
+      setState(() {
+        if (!hasActiveDeliveries) {
+          _currentStatus = 'DISPONIVEL';
+        }
+      });
+    } catch (e) {
+      print('Erro ao verificar pedidos ativos: $e');
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -607,6 +623,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget _buildDashboard(int motoristId) {
     return RefreshIndicator(
       onRefresh: () async {
+        await _loadEntregasAtivas();
         setState(() {
           _loadEntregasAtivas();
         });
