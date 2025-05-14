@@ -13,6 +13,7 @@ import '../services/location_service.dart';
 import '../services/notification_manager.dart';
 import '../services/notification_service.dart';
 import 'dialog/new_order_details_dialog.dart';
+import 'driver_statistics_screen.dart';
 import 'notifications_screen.dart';
 import 'package:badges/badges.dart' as badges;
 import 'order_tracking_screen.dart';
@@ -1224,12 +1225,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             },
           ),
           const Divider(),
-          _buildSectionTitle('Meu Veículo'),
+          _buildSectionTitle('Desempenho'),
           ListTile(
-            title: const Text('Meus Veículos'),
+            leading: const Icon(Icons.bar_chart, color: Colors.blue),
+            title: const Text('Minhas Estatísticas'),
+            subtitle: const Text('Visualize seu desempenho e métricas'),
             trailing: const Icon(Icons.keyboard_arrow_right),
             onTap: () {
-              // Implementação da navegação para tela de veículos
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DriverStatisticsScreen(
+                    apiService: widget.apiService,
+                    authService: widget.authService,
+                  ),
+                ),
+              );
             },
           ),
           const Divider(),
@@ -1269,6 +1280,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ),
     );
   }
+
 
   Widget _buildSectionTitle(String title) {
     return Padding(
