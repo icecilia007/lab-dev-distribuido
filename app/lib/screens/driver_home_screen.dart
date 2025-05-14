@@ -1066,54 +1066,108 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   void _showReportProblemDialog(int entregaId) {
     final _problemaController = TextEditingController();
+    String _selectedTipo = 'BLOQUEIO';
+    double _raioImpacto = 1.0;
+    int _duracaoHoras = 5;
+
+    // Guarda referência ao contexto original
+    final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Reportar Problema'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Tipo de Problema',
-                  border: OutlineInputBorder(),
+          title: const Text('Reportar Incidente'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Incidente',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: _selectedTipo,
+                  items: const [
+                    DropdownMenuItem(value: 'ACIDENTE', child: Text('Acidente')),
+                    DropdownMenuItem(value: 'BLOQUEIO', child: Text('Bloqueio na Via')),
+                    DropdownMenuItem(value: 'VEICULO', child: Text('Problema no Veículo')),
+                    DropdownMenuItem(value: 'OUTRO', child: Text('Outro')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      _selectedTipo = value;
+                    }
+                  },
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'ACIDENTE', child: Text('Acidente')),
-                  DropdownMenuItem(value: 'BLOQUEIO', child: Text('Bloqueio na Via')),
-                  DropdownMenuItem(value: 'VEICULO', child: Text('Problema no Veículo')),
-                  DropdownMenuItem(value: 'OUTRO', child: Text('Outro')),
-                ],
-                onChanged: (value) {},
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _problemaController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _problemaController,
+                  decoration: const InputDecoration(
+                    labelText: 'Descrição',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
                 ),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        decoration: const InputDecoration(
+                          labelText: 'Raio de Impacto (km)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        initialValue: '1.0',
+                        onChanged: (value) {
+                          _raioImpacto = double.tryParse(value) ?? 1.0;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        decoration: const InputDecoration(
+                          labelText: 'Duração (horas)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        initialValue: '5',
+                        onChanged: (value) {
+                          _duracaoHoras = int.tryParse(value) ?? 5;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Problema reportado com sucesso'),
-                    backgroundColor: Colors.green,
-                  ),
+              onPressed: () async {
+                // Feche o diálogo principal
+                Navigator.pop(dialogContext);
+
+                // Capture os dados para uso posterior
+                final selectedTipo = _selectedTipo;
+                final descricao = _problemaController.text;
+                final raioImpacto = _raioImpacto;
+                final duracaoHoras = _duracaoHoras;
+
+                // Use um método separado para processar a solicitação
+                _processarReporteIncidente(
+                    selectedTipo,
+                    descricao,
+                    raioImpacto,
+                    duracaoHoras
                 );
               },
               child: const Text('Reportar'),
@@ -1122,6 +1176,83 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
       },
     );
+  }
+
+// Método separado para processar o relatório sem depender do contexto do diálogo
+  Future<void> _processarReporteIncidente(
+      String tipo,
+      String descricao,
+      double raioImpactoKm,
+      int duracaoHoras
+      ) async {
+    // Use o BuildContext principal da tela, não do diálogo que será descartado
+    BuildContext? loadingContext;
+
+    if (!mounted) return;
+
+    // Exiba o indicador de carregamento
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        loadingContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    try {
+      // Obter a localização atual
+      Position position = await Geolocator.getCurrentPosition();
+
+      // Enviar relatório de incidente para a API
+      final incidenteResponse = await widget.apiService.reportarIncidente(
+        widget.authService.currentUser!.id,
+        position.latitude,
+        position.longitude,
+        tipo,
+        descricao,
+        raioImpactoKm,
+        duracaoHoras,
+      );
+
+      // Fechar o indicador de carregamento com segurança
+      if (mounted && loadingContext != null) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      // Exibir resposta adequada
+      if (incidenteResponse != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Incidente reportado com sucesso'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Falha ao reportar incidente'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Fechar indicador de carregamento com segurança
+      if (mounted && loadingContext != null) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao reportar incidente: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildStatusChip(String status) {
