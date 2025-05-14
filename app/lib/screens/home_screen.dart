@@ -136,36 +136,40 @@ class _HomeScreenState extends State<HomeScreen> {
     child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-    Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-    Text(
-    'Olá, ${widget.authService.currentUser!.name}!',
-    style: const TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    ),
-    ),
-      ElevatedButton.icon(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => NewOrderScreen(
-                apiService: widget.apiService,
-                authService: widget.authService,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Olá, ${widget.authService.currentUser!.name}!',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8), // Add spacing between name and button
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => NewOrderScreen(
+                      apiService: widget.apiService,
+                      authService: widget.authService,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Novo Pedido'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
               ),
             ),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Novo Pedido'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
+          ),
+        ],
       ),
-    ],
-    ),
       const SizedBox(height: 24),
       const Text(
         'Pedidos Ativos',
