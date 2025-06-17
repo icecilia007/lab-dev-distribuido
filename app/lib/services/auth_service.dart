@@ -51,7 +51,7 @@ class AuthService {
     print("Token após logout: ${_apiService.authToken}");
   }
 
-  Future<Map<String, dynamic>> autoLogin() async {
+  Future<Map<String, dynamic>> \autoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
     final authToken = prefs.getString('authToken');

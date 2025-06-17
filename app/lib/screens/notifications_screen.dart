@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import '../models/notificacao.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import '../services/notification_manager.dart';
+import '../manager/notification_manager.dart';
 import 'dialog/new_order_details_dialog.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -84,22 +84,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (notificacao.titulo.toLowerCase().contains("pedido dispon") && notificacao.payload != null) {
       try {
-        // Processar dados independentemente da estrutura
         final data = jsonDecode(notificacao.payload!);
 
-        // Extrair os dados do pedido com tratamento para diferentes estruturas
         Map<String, dynamic>? pedidoData;
 
-        // Tentar todas as estruturas possíveis
         if (data['dadosEvento'] != null && data['dadosEvento']['dados'] != null) {
           pedidoData = Map<String, dynamic>.from(data['dadosEvento']['dados']);
         } else if (data['dados'] != null) {
           pedidoData = Map<String, dynamic>.from(data['dados']);
         }
 
-        // Mostrar o diálogo de aceitação
         if (pedidoData != null) {
-          // IMPORTANTE: Uso do Navigator.of para garantir contexto correto
           Navigator.of(context).push(
             DialogRoute(
               context: context,

@@ -1,4 +1,3 @@
-// lib/screens/order_tracking_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';  // Importar flutter_map em vez de google_maps_flutter
@@ -37,7 +36,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     super.initState();
     _loadPedidoAndLocalizacao();
 
-    // Configurar timer para atualizar a cada 2 minutos conforme requisito
     _refreshTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
       if (mounted) {
         _refreshTracking();
@@ -65,10 +63,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         final localizacao = await widget.apiService.getLocalizacaoPedido(widget.pedidoId);
         _localizacao = localizacao;
 
-        // Configurar os marcadores e visualização do mapa
         _setupMapView();
       } catch (e) {
-        // Ainda podemos exibir o pedido sem a localização atual
         print('Erro ao buscar localização: $e');
       }
 
@@ -129,7 +125,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       ),
     );
 
-    // Marcador de localização atual (se disponível)
     if (_localizacao != null) {
       _markers.add(
         Marker(
@@ -141,7 +136,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       );
     }
 
-    // Se tiver dados de rota do OSRM, adicionar polyline
     if (_pedido?.rotaMotorista?.rota != null) {
       try {
         final rotaData = _pedido!.rotaMotorista!.rota;
