@@ -8,12 +8,26 @@ Os casos de teste a seguir cobrem o fluxo completo do sistema logístico, inclui
 - Microsserviços de usuários, pedidos e rastreamento estão operacionais
 - RabbitMQ está configurado e operacional
 - Banco de dados inicializado
+- Rota padrão ```localhost:8000```
+  - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
+  - Bearer token é retornado ao realizar o login/register.
+### Token:
+
+1. Login:
+   ```http
+   POST /api/auth/login
+   {
+      "email": "pedro.motorista@exemplo.com",
+      "password": "senha456"
+   }
+   ```
+   - Verificar: resposta 201 Created com detalhes do baerer token no header da response.
 
 ### Passos:
 
 1. **Cadastrar um cliente:**
    ```http
-   POST /api/usuarios/clientes
+   POST /api/registro/usuarios/clientes
    {
      "nome": "João Silva",
      "email": "joao.silva@exemplo.com",
@@ -25,7 +39,7 @@ Os casos de teste a seguir cobrem o fluxo completo do sistema logístico, inclui
 
 2. **Cadastrar um motorista:**
    ```http
-   POST /api/usuarios/motoristas
+   POST /api/registro/usuarios/motoristas
    {
      "nome": "Pedro Motorista",
      "email": "pedro.motorista@exemplo.com",
