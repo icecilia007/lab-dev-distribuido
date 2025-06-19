@@ -1,6 +1,6 @@
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    build: .
     container_name: rabbitmq
     ports:
       - "5672:5672"
@@ -9,6 +9,22 @@ services:
       - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
       - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  lambda-webhook:
+    build:
+      context: ../../aws/lambda
+      dockerfile: Dockerfile.webhook
+    container_name: lambda-webhook
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - LAMBDA_URL=http://172.17.0.1:9000/2015-03-31/functions/function/invocations
+      - QUEUE_NAME=lambda.webhook
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
 
 volumes:
   rabbitmq_data:
