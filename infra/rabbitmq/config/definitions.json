@@ -61,6 +61,13 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
+    },
+    {
+      "name": "lambda.webhook",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
     }
   ],
   "bindings": [
@@ -92,6 +99,14 @@
       "source": "logistica.exchange",
       "vhost": "/",
       "destination": "notificacoes.geral",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    },
+    {
+      "source": "logistica.exchange",
+      "vhost": "/",
+      "destination": "lambda.webhook",
       "destination_type": "queue",
       "routing_key": "#",
       "arguments": {}
