@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant AM as App Móvel<br/>(Etapa 1)
+    participant MS as Microserviços<br/>(Etapa 2)
+    participant EQ as Event Queue
+    participant LF as Lambda Functions<br/>(Serverless)
+    participant NS as Notification Service
+    participant ES as Email Service
+    participant PST as Pub/Sub Topics
+    participant DB as Database
+
+    Note over AM, DB: Funcionalidade 1: Finalização de Pedido
+
+    AM->>MS: Contratado finaliza pedido
+    MS->>MS: Atualiza status do pedido
+    MS->>EQ: Publica evento "pedido_finalizado"
+
+    Note over EQ: Event: {<br/>type: "pedido_finalizado",<br/>cliente_id: "456",<br/>contratado_id: "789",<br/>timestamp: "2025-06-16T10:30:00Z"<br/>}
+
+    EQ->>LF: Trigger evento pedido_finalizado
+    LF->>MS: GET /pedidos/{id} (dados completos)
+    MS-->>LF: Dados do pedido
+    LF->>NS: Envia push notification
+    NS-->>AM: "Pedido concluído!<br/>Avalie o serviço prestado"
+    LF->>DB: Registra log da notificação
+    LF->>MS: GET /pedidos/{id}/resumo
+    MS-->>LF: Dados para e-mail
+    LF->>ES: Processa template de e-mail
+
+    alt E-mail para Cliente
+        ES->>AM: Envia e-mail resumo
+        Note right of AM: Assunto: "Entrega Concluída"<br/>Conteúdo: Resumo completo
+    end
+
+    alt E-mail para Contratado
+        ES->>MS: Envia e-mail resumo
+        Note right of MS: Assunto: "Serviço Finalizado"<br/>Conteúdo: Dados da entrega
+    end
+
+    Note over AM, DB: Funcionalidade 2: Campanhas Promocionais
+
+    MS->>LF: Trigger campanha promocional
+    LF->>MS: GET /clientes (dados para segmentação)
+    MS-->>LF: Lista de clientes
+    LF->>LF: Processa segmentação
+
+    Note over LF: Segmentação por:<br/>- Localização<br/>- Frequência de uso<br/>- Histórico de pedidos<br/>- Comportamento no app
+
+    alt Grupo: Clientes Premium
+        LF->>PST: Publica em tópico "premium_clients"
+        PST-->>NS: Mensagem personalizada<br/>com descontos especiais
+        NS->>AM: Push notifications (grupo premium)
+        LF->>LF: Processa lista premium
+    end
+
+    alt Grupo: Clientes Região Sul
+        LF->>PST: Publica em tópico "regiao_sul"
+        PST-->>NS: Promoção regional<br/>com frete grátis
+        NS->>AM: Push notifications (região sul)
+        LF->>LF: Processa lista região sul
+    end
+
+    alt Grupo: Todos os Clientes
+        LF->>PST: Publica em tópico "all_clients"
+        PST-->>NS: Campanha geral<br/>com desconto padrão
+        NS->>AM: Push notifications (broadcast)
+        LF->>LF: Processa todos os clientes
+    end
+
+    LF->>DB: Registra métricas da campanha
+
+    Note over DB: Logs:<br/>- Grupos atingidos<br/>- Quantidade de envios<br/>- Taxa de entrega
+
+    AM->>LF: Usuário utiliza promoção
+    LF->>DB: Registra conversão da campanha

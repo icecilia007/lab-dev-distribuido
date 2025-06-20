@@ -1,0 +1,215 @@
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - logistica-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    build: ./infra/rabbitmq
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./infra/rabbitmq/config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/config/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - logistica-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  usuario-service:
+    build: ./usuario
+    container_name: usuario-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/main_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logistica-network
+    restart: unless-stopped
+
+  pedidos-service:
+    build: ./pedidos
+    container_name: pedidos-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/main_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - USUARIO_SERVICE_URL=http://usuario-service:8080
+      - RASTREAMENTO_SERVICE_URL=http://rastreamento-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      usuario-service:
+        condition: service_started
+    networks:
+      - logistica-network
+    restart: unless-stopped
+
+  rastreamento-service:
+    build: ./rastreamento
+    container_name: rastreamento-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/main_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - USUARIO_SERVICE_URL=http://usuario-service:8080
+      - PEDIDOS_SERVICE_URL=http://pedidos-service:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      usuario-service:
+        condition: service_started
+      pedidos-service:
+        condition: service_started
+    networks:
+      - logistica-network
+    restart: unless-stopped
+
+  notificacao-service:
+    build: ./notificacao
+    container_name: notificacao-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/main_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - NOTIFICATION_MODE=${NOTIFICATION_MODE:-JAVA}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logistica-network
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./api-gatway
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICES_AUTH_URL=http://usuario-service:8080
+      - SERVICES_USUARIO_URL=http://usuario-service:8080
+      - SERVICES_PEDIDO_URL=http://pedidos-service:8081
+      - SERVICES_RASTREAMENTO_URL=http://rastreamento-service:8082
+      - SERVICES_NOTIFICACAO_URL=http://notificacao-service:8083
+    depends_on:
+      - usuario-service
+      - pedidos-service
+      - rastreamento-service
+      - notificacao-service
+    networks:
+      - logistica-network
+    restart: unless-stopped
+
+  lambda-simulator:
+    build: ./lambda
+    container_name: lambda-simulator
+    ports:
+      - "9000:8080"
+    environment:
+      - NOTIFICACOES_URL=http://notificacao-service:8083
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=main_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      notificacao-service:
+        condition: service_started
+    networks:
+      - logistica-network
+    restart: unless-stopped
+    profiles:
+      - lambda
+
+  lambda-webhook:
+    build:
+      context: ./lambda
+      dockerfile: Dockerfile.webhook
+    container_name: lambda-webhook
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - LAMBDA_URL=http://lambda-simulator:8080/2015-03-31/functions/function/invocations
+      - QUEUE_NAME=lambda.webhook
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      lambda-simulator:
+        condition: service_started
+    networks:
+      - logistica-network
+    restart: unless-stopped
+    profiles:
+      - lambda
+
+volumes:
+  postgres-data:
+  rabbitmq_data:
+
+networks:
+  logistica-network:
+    driver: bridge
