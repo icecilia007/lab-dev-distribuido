@@ -1,6 +1,6 @@
 server:
   port: 8083
-  address: 127.0.0.1  # Aceita apenas conexões locais (mesmo host)
+  address: 0.0.0.0  # Aceita apenas conexões locais (mesmo host)
   # OU address: 192.168.1.100  # Aceita apenas conexões do endereço IP específico da rede interna
 security:
   internal:

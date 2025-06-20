@@ -15,7 +15,7 @@ services:
 
   lambda-webhook:
     build:
-      context: ../../aws/lambda
+      context: ../../lambda
       dockerfile: Dockerfile.webhook
     container_name: lambda-webhook
     environment:

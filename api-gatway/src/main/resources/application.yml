@@ -15,58 +15,69 @@ springdoc:
 # Configurações dos serviços
 services:
   auth:
-    url: http://localhost:8000
+    url: "${SERVICES_AUTH_URL:http://localhost:8000}"
   usuario:
-    url: http://localhost:8080
+    url: "${SERVICES_USUARIO_URL:http://localhost:8080}"
   pedido:
-    url: http://localhost:8081
+    url: "${SERVICES_PEDIDO_URL:http://localhost:8081}"
   rastreamento:
-    url: http://localhost:8082
+    url: "${SERVICES_RASTREAMENTO_URL:http://localhost:8082}"
   notificacao:
-    url: http://localhost:8083
+    url: "${SERVICES_NOTIFICACAO_URL:http://localhost:8083}"
 
 spring:
   application:
     name: api-gateway
   cloud:
     gateway:
-      # Rotas para os microsserviços
       routes:
         - id: swagger-ui-route
           uri: http://localhost:${server.port}
           predicates:
             - Path=/swagger-ui/**,/v3/api-docs/**,/swagger-resources/**,/webjars/**
-        # Serviço de Auth
+
         - id: auth-service
-          uri: http://localhost:8000
+          uri: ${SERVICES_USUARIO_URL:http://localhost:8080}
           predicates:
             - Path=/api/auth/**
-        # Serviço de Usuários
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
+
         - id: usuario-service
-          uri: http://localhost:8080
+          uri: ${SERVICES_USUARIO_URL:http://localhost:8080}
           predicates:
             - Path=/api/usuarios/**
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
+        - id: usuario-registro-service
+          uri: ${SERVICES_USUARIO_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/registro/usuarios/**
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
 
-        # Serviço de Pedidos
         - id: pedido-service
-          uri: http://localhost:8081
+          uri: ${SERVICES_PEDIDO_URL:http://localhost:8081}
           predicates:
             - Path=/api/pedidos/**
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
 
-        # Serviço de Rastreamento
         - id: rastreamento-service
-          uri: http://localhost:8082
+          uri: ${SERVICES_RASTREAMENTO_URL:http://localhost:8082}
           predicates:
             - Path=/api/rastreamento/**
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
 
-        # Serviço de Notificações
         - id: notificacao-service
-          uri: http://localhost:8083
+          uri: ${SERVICES_NOTIFICACAO_URL:http://localhost:8083}
           predicates:
             - Path=/api/notificacoes/**
-        # Rota para WebSocket de Notificações
+          filters:
+            - AddRequestHeader=X-Internal-Auth,2BE2AB6217329B86A427A3819B626
         - id: notificacao-websocket
-          uri: ws://localhost:8083
+          uri: ws://notificacao-service:8083
           predicates:
             - Path=/ws-notificacao/**
           filters:

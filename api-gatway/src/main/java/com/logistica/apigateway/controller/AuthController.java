@@ -24,16 +24,19 @@ public class AuthController {
     private final String jwtSecret;
     private final long jwtExpiration;
     private final WebClient webClient;
+    private final String usuarioServiceUrl;
 
     public AuthController(
             WebClient.Builder webClientBuilder,
             @Value("${security.jwt.secret}") String jwtSecret,
             @Value("${security.jwt.expiration:86400}") long jwtExpiration,
             @Value("${security.internal.header-name}") String secretHeaderName,
-            @Value("${security.internal.header-value}") String secretHeaderValue) {
+            @Value("${security.internal.header-value}") String secretHeaderValue,
+            @Value("${services.usuario.url:http://localhost:8080}") String usuarioServiceUrl) {
 
         this.jwtSecret = jwtSecret;
         this.jwtExpiration = jwtExpiration;
+        this.usuarioServiceUrl = usuarioServiceUrl;
         this.webClient = webClientBuilder
                 .defaultHeader(secretHeaderName, secretHeaderValue)
                 .build();
@@ -43,7 +46,7 @@ public class AuthController {
     public Mono<ResponseEntity<?>> login(@RequestBody Mono<LoginRequest> loginRequest) {
         return loginRequest.flatMap(request ->
                 webClient.post()
-                        .uri("http://localhost:8080/api/usuarios/login")
+                        .uri(usuarioServiceUrl + "/api/usuarios/login")
                         .bodyValue(request)
                         .retrieve()
                         .bodyToMono(Map.class)
@@ -63,7 +66,7 @@ public class AuthController {
     @PostMapping("/registro/cliente")
     public Mono<ResponseEntity<?>> registrarCliente(@RequestBody Mono<Map<String, Object>> clienteRequest) {
         return clienteRequest.flatMap(request -> webClient.post()
-                .uri("http://localhost:8080/api/usuarios/clientes")
+                .uri(usuarioServiceUrl + "/api/usuarios/clientes")
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -84,7 +87,7 @@ public class AuthController {
     public Mono<ResponseEntity<?>> registrarMotorista(@RequestBody Mono<Map<String, Object>> motoristaRequest) {
         return motoristaRequest.flatMap(request -> {
             return webClient.post()
-                    .uri("http://localhost:8080/api/usuarios/motoristas")
+                    .uri(usuarioServiceUrl + "/api/usuarios/motoristas")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
@@ -104,7 +107,7 @@ public class AuthController {
     public Mono<ResponseEntity<?>> registrarOperador(@RequestBody Mono<Map<String, Object>> operadorRequest) {
         return operadorRequest.flatMap(request -> {
             return webClient.post()
-                    .uri("http://localhost:8080/api/usuarios/operadores")
+                    .uri(usuarioServiceUrl + "/api/usuarios/operadores")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
