@@ -34,7 +34,7 @@
 		<protobuf.version>3.24.0</protobuf.version>
 		<protoc.version>3.24.0</protoc.version>
 		<!-- Defina de acordo com seu sistema operacional -->
-		<os.detected.classifier>windows-x86_64</os.detected.classifier>
+		<!-- <os.detected.classifier>windows-x86_64</os.detected.classifier> -->
 		<!-- Outros valores: linux-x86_64, osx-x86_64, osx-aarch_64 (M1/M2) -->
 	</properties>
 	<dependencies>
