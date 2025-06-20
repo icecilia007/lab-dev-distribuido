@@ -1,0 +1,11 @@
+services:
+  lambda-simulator:
+    build: .
+    container_name: lambda-simulator
+    ports:
+      - "9000:8080"
+    environment:
+      - MICROSERVICES_URL=http://host.docker.internal:8080
+    restart: unless-stopped
+    volumes:
+      - ./main.py:/var/task/main.py
