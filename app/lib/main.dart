@@ -16,7 +16,7 @@ import 'screens/driver/driver_home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final apiService = ApiService( apiGatewayUrl: 'http://10.0.2.2:8000',);
+  final apiService = ApiService( apiGatewayUrl: 'https://aq72n5uzcb.execute-api.us-east-1.amazonaws.com/prod',);
   final authService = AuthService(apiService);
   final notificationService = NotificationService();
   final notificationManager = NotificationManager(apiService);

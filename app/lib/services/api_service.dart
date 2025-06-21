@@ -20,7 +20,7 @@ class ApiService {
   String? _authToken;
 
   ApiService({String? apiGatewayUrl})
-      : this.apiGatewayUrl = apiGatewayUrl ?? 'http://10.0.2.2:8000';
+      : this.apiGatewayUrl = apiGatewayUrl ?? 'https://aq72n5uzcb.execute-api.us-east-1.amazonaws.com/prod';
 
   set authToken(String? token) {
     _authToken = token;
@@ -43,13 +43,13 @@ class ApiService {
       _authToken = null;
 
       print("Iniciando login para: $email");
-      final baseUrl = apiGatewayUrl ?? 'http://10.0.2.2:8000';
+      final baseUrl = apiGatewayUrl ?? 'https://aq72n5uzcb.execute-api.us-east-1.amazonaws.com/prod';
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
-          'password': password,
+          'senha': password,
         }),
       );
 
@@ -57,7 +57,7 @@ class ApiService {
       print("Headers: ${response.headers}");
 
       if (response.statusCode == 200) {
-        final authHeader = response.headers['authorization'] ??
+        final authHeader = response.headers['x-amzn-remapped-authorization'] ??
             response.headers['Authorization'];
 
         print("Auth Header: $authHeader");
@@ -85,7 +85,7 @@ class ApiService {
   Future<bool> registrarCliente(Map<String, dynamic> clienteData) async {
     try {
       final response = await http.post(
-        Uri.parse('$apiGatewayUrl/api/auth/registro/cliente'),
+        Uri.parse('$apiGatewayUrl/api/auth/registro-cliente'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(clienteData),
       );
@@ -107,7 +107,7 @@ class ApiService {
   Future<bool> registrarMotorista(Map<String, dynamic> motoristaData) async {
     try {
       final response = await http.post(
-        Uri.parse('$apiGatewayUrl/api/auth/registro/motorista'),
+        Uri.parse('$apiGatewayUrl/api/auth/registro-motorista'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(motoristaData),
       );
@@ -128,7 +128,7 @@ class ApiService {
   Future<bool> registrarOperador(Map<String, dynamic> operadorData) async {
     try {
       final response = await http.post(
-        Uri.parse('$apiGatewayUrl/api/auth/registro/operador'),
+        Uri.parse('$apiGatewayUrl/api/auth/registro-operador'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(operadorData),
       );
@@ -165,61 +165,51 @@ class ApiService {
   }
 
   Future<List<Pedido>> getPedidosByCliente(int clienteId, userType) async {
-    var connectivityResult = await Connectivity().checkConnectivity();
-    bool isConnected = connectivityResult != ConnectivityResult.none;
+    try {
+      final response = await http.get(
+        Uri.parse('$apiGatewayUrl/api/pedidos/usuario-info/$userType/$clienteId'),
+        headers: _authHeaders,
+      );
 
-    if (isConnected) {
-      try {
-        final response = await http.get(
-          Uri.parse('$apiGatewayUrl/api/pedidos/$userType/$clienteId'),
-          headers: _authHeaders,
-        );
+      if (response.statusCode == 200) {
+        print('Response headers: ${response.headers}');
+        print('Response content type: ${response.headers['content-type']}');
 
-        if (response.statusCode == 200) {
-          print('Response headers: ${response.headers}');
-          print('Response content type: ${response.headers['content-type']}');
-
-          if (response.body.isEmpty) {
-            print('API retornou uma lista vazia para pedidos');
-            return [];
-          }
-
-          try {
-            // Adicione log para ver o início do body
-            print('Primeiros 100 caracteres: ${response.body.substring(0, min(100, response.body.length))}');
-
-            List<dynamic> pedidosJson = jsonDecode(response.body);
-            print('JSON decodificado com sucesso. Encontrados ${pedidosJson.length} pedidos');
-            List<Pedido> pedidos = pedidosJson.map((json) => Pedido.fromJson(json)).toList();
-
-            for (var pedido in pedidos) {
-              if (pedido.status == 'ENTREGUE') {
-                await _databaseService.insertPedido(pedido);
-              }
-            }
-
-            return pedidos;
-          } catch (e) {
-            print('Erro ao decodificar JSON: $e');
-            throw Exception('Erro ao processar resposta: $e');
-          }
-        } else {
-          throw Exception('Falha ao buscar pedidos: ${response.statusCode}');
+        if (response.body.isEmpty) {
+          print('API retornou uma lista vazia para pedidos');
+          return [];
         }
-      } catch (e) {
-        print('Erro ao buscar da API: $e. Tentando buscar do banco local...');
-        return await _databaseService.getPedidosByCliente(clienteId);
+
+        try {
+          // Adicione log para ver o início do body
+          print('Primeiros 100 caracteres: ${response.body.substring(0, min(100, response.body.length))}');
+
+          List<dynamic> pedidosJson = jsonDecode(response.body);
+          print('JSON decodificado com sucesso. Encontrados ${pedidosJson.length} pedidos');
+          List<Pedido> pedidos = pedidosJson.map((json) => Pedido.fromJson(json)).toList();
+
+          return pedidos;
+        } catch (e) {
+          print('Erro ao decodificar JSON: $e');
+          throw Exception('Erro ao processar resposta: $e');
+        }
+      } else if (response.statusCode == 401) {
+        throw Exception('Token expirado. Faça login novamente.');
+      } else if (response.statusCode == 403) {
+        throw Exception('Acesso negado. Verifique suas permissões.');
+      } else {
+        throw Exception('Falha ao buscar pedidos: ${response.statusCode} - ${response.body}');
       }
-    } else {
-      print('Dispositivo offline. Buscando pedidos do banco local...');
-      return await _databaseService.getPedidosByCliente(clienteId);
+    } catch (e) {
+      print('Erro ao buscar da API: $e');
+      rethrow; // Propaga o erro sem tentar banco local
     }
   }
 
   Future<Pedido> getPedidoById(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/consulta/$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -268,7 +258,7 @@ class ApiService {
   Future<bool> cancelarPedido(int pedidoId) async {
     try {
       final response = await http.patch(
-        Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/cancelar'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/acoes/cancelar/$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -314,8 +304,14 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => Notificacao.fromJson(json)).toList();
+      } else if (response.statusCode == 401) {
+        print('Token expirado para notificações');
+        throw Exception('Token expirado. Faça login novamente.');
+      } else if (response.statusCode == 403) {
+        print('Acesso negado para notificações');
+        throw Exception('Acesso negado às notificações.');
       } else {
-        print('Erro ao buscar notificações: ${response.statusCode}');
+        print('Erro ao buscar notificações: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
@@ -341,7 +337,7 @@ class ApiService {
   Future<Map<String, dynamic>?> buscarPreferenciasNotificacao(int usuarioId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias/$usuarioId'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias-usuario/$usuarioId'),
         headers: _authHeaders,
       );
 
@@ -375,7 +371,7 @@ class ApiService {
   Future<List<Localizacao>> getHistoricoLocalizacaoPedido(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/historico/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/historico-pedido/$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -459,7 +455,7 @@ class ApiService {
       ) async {
     try {
       final response = await http.post(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/localizacao'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/registrar-localizacao'),
         headers: _authHeaders,
         body: jsonEncode({
           'motoristaId': motoristaId,
@@ -481,7 +477,7 @@ class ApiService {
   }
 
   Future confirmarEntrega(int pedidoId, int motoristaId) async {
-    final url = '$apiGatewayUrl/api/rastreamento/pedido/$pedidoId/entrega?motoristaId=$motoristaId';
+    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega/$pedidoId/?motoristaId=$motoristaId';
     try {
       final response = await http.post(
         Uri.parse(url),
@@ -501,7 +497,7 @@ class ApiService {
 
   Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File fotoColeta) async {
     try {
-      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/pedido/$pedidoId/coleta?motoristaId=$motoristaId');
+      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/acao-coleta/$pedidoId/?motoristaId=$motoristaId');
       var request = http.MultipartRequest('POST', uri);
 
       _authHeaders.forEach((key, value) {
@@ -553,7 +549,7 @@ class ApiService {
       ) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/estatisticas/motorista/$driverId?dataInicio=$dataInicio&dataFim=$dataFim'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/motorista/estatistica/$driverId?dataInicio=$dataInicio&dataFim=$dataFim'),
         headers: _authHeaders,
       );
 

@@ -1,3 +1,7 @@
+// ARQUIVO: app/lib/services/notification_service.dart
+// 
+// SUBSTITUA o conteúdo atual por este código atualizado para AWS WebSocket
+
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -10,6 +14,9 @@ class NotificationService {
   WebSocketChannel? _channel;
   bool _isConnected = false;
   Function(Map<String, dynamic>)? _onNotificationReceived;
+
+  // URL do WebSocket AWS (substitua pelo seu WebSocket ID)
+  static const String _awsWebSocketUrl = 'wss://23b38pazkc.execute-api.us-east-1.amazonaws.com/prod';
 
   Future init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -50,137 +57,193 @@ class NotificationService {
         }
       },
     );
-
   }
 
-
+  /// Conectar ao WebSocket AWS
   Future<void> connectToWebSocket(String userId, String token) async {
     if (_isConnected) {
       await disconnectWebSocket();
     }
-    print("Criando conexão web socket para o cliente com id: { $userId }");
+    print("Criando conexão WebSocket AWS para o usuário com id: $userId");
 
     try {
+      // Construir URL com parâmetros de autenticação
+      final wsUrl = '$_awsWebSocketUrl?token=$token&userId=$userId';
 
-      // final wsUrl = Uri(
-      //     scheme: 'ws',
-      //     host: '10.0.2.2',
-      //     port: 8000,
-      //     path: '/ws-notificacao',
-      //     queryParameters: {'userId': userId}
-      // ).toString();
-
-      final wsUrl = 'ws://10.0.2.2:8000/ws-notificacao?userId=$userId';
+      print('Conectando ao WebSocket AWS: $wsUrl');
 
       _channel = IOWebSocketChannel.connect(
         Uri.parse(wsUrl),
         headers: {
-          'Authorization': 'Bearer $token'
+          'Authorization': 'Bearer $token',
         },
       );
 
       _isConnected = true;
 
-      _channel!.stream.listen((message) {
-        _handleIncomingMessage(message);
-      }, onError: (error) {
-        print('WebSocket error: $error');
-        _isConnected = false;
-      }, onDone: () {
-        print('WebSocket connection closed');
-        _isConnected = false;
-      });
+      _channel!.stream.listen(
+              (message) {
+            _handleIncomingMessage(message);
+          },
+          onError: (error) {
+            print('WebSocket AWS error: $error');
+            _isConnected = false;
+            // Tentar reconectar após 5 segundos
+            _scheduleReconnection(userId, token);
+          },
+          onDone: () {
+            print('WebSocket AWS connection closed');
+            _isConnected = false;
+            // Tentar reconectar após 5 segundos
+            _scheduleReconnection(userId, token);
+          }
+      );
 
-      print('WebSocket conectado para usuário $userId');
+      print('WebSocket AWS conectado para usuário $userId');
     } catch (e) {
-      print('Falha ao conectar ao WebSocket: $e');
+      print('Falha ao conectar ao WebSocket AWS: $e');
       _isConnected = false;
+      // Tentar reconectar após 10 segundos em caso de erro
+      _scheduleReconnection(userId, token, delay: 10);
     }
   }
 
+  /// Reagendar reconexão automática
+  void _scheduleReconnection(String userId, String token, {int delay = 5}) {
+    Future.delayed(Duration(seconds: delay), () {
+      if (!_isConnected) {
+        print('Tentando reconectar ao WebSocket AWS...');
+        connectToWebSocket(userId, token);
+      }
+    });
+  }
 
   Future<void> disconnectWebSocket() async {
     if (_channel != null) {
       await _channel!.sink.close();
       _channel = null;
       _isConnected = false;
+      print('WebSocket AWS desconectado');
     }
   }
 
   void _handleIncomingMessage(dynamic message) {
-    print('WebSocket - Mensagem recebida: $message');
+    print('WebSocket AWS - Mensagem recebida: $message');
 
     try {
-      print('WebSocket - Tipo da mensagem: ${message.runtimeType}');
+      print('WebSocket AWS - Tipo da mensagem: ${message.runtimeType}');
 
       final Map<String, dynamic> notificationData;
       if (message is String) {
-        print('WebSocket - Convertendo string para JSON');
+        print('WebSocket AWS - Convertendo string para JSON');
         notificationData = jsonDecode(message);
       } else if (message is Map) {
-        print('WebSocket - Mensagem já é um Map');
+        print('WebSocket AWS - Mensagem já é um Map');
         notificationData = Map<String, dynamic>.from(message);
       } else {
-        print('WebSocket - Tipo de mensagem inesperado');
+        print('WebSocket AWS - Tipo de mensagem inesperado');
         return;
       }
 
-      print('WebSocket - Dados da notificação: $notificationData');
+      print('WebSocket AWS - Dados da notificação: $notificationData');
 
-      String? tipoEvento = notificationData['tipoEvento'] ??
-          notificationData['evento'] ??
-          notificationData['dadosEvento']?['evento'];
+      // Verificar se é uma notificação do sistema AWS
+      if (notificationData.containsKey('action') &&
+          notificationData['action'] == 'notification') {
 
-      if(tipoEvento!=null) {
-        if (tipoEvento == 'PEDIDO_DISPONIVEL') {
-          final pedidoId = notificationData['dadosEvento']?['dados']?['pedidoId'];
+        final data = notificationData['data'] ?? notificationData;
+        _processAWSNotification(data);
 
-          final notificacaoFormatada = {
-            'id': pedidoId ?? DateTime
-                .now()
-                .millisecondsSinceEpoch,
-            'titulo': 'Novo pedido disponível',
-            'mensagem': notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
-            'dataCriacao': DateTime.now().toIso8601String(),
-            'lida': false,
-            'payload': jsonEncode(notificationData)
-          };
-
-          showNotification(
-            id: pedidoId ?? DateTime
-                .now()
-                .millisecondsSinceEpoch,
-            title: 'Novo pedido disponível',
-            body: notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
-            payload: jsonEncode(notificationData),
-          );
-
-          if (_onNotificationReceived != null) {
-            _onNotificationReceived!(notificacaoFormatada);
-          }
-        } else{
-          showNotification(
-            id: notificationData['id'] ?? DateTime.now().millisecondsSinceEpoch,
-            title: notificationData['titulo'] ?? 'Nova notificação',
-            body: notificationData['mensagem'] ?? '',
-          );
-        }
-
+      } else {
+        // Manter compatibilidade com formato antigo
+        _processLegacyNotification(notificationData);
       }
 
+      // Sempre chamar o callback se registrado
       if (_onNotificationReceived != null) {
-        print('WebSocket - Chamando callback de notificação');
+        print('WebSocket AWS - Chamando callback de notificação');
         _onNotificationReceived!(notificationData);
       } else {
-        print('WebSocket - Nenhum callback registrado');
+        print('WebSocket AWS - Nenhum callback registrado');
       }
+
     } catch (e, stackTrace) {
-      print('WebSocket - Erro ao processar notificação: $e');
-      print('WebSocket - Stack trace: $stackTrace');
+      print('WebSocket AWS - Erro ao processar notificação: $e');
+      print('WebSocket AWS - Stack trace: $stackTrace');
     }
   }
 
+  /// Processar notificações do formato AWS
+  void _processAWSNotification(Map<String, dynamic> data) {
+    final titulo = data['titulo'] ?? data['title'] ?? 'Nova Notificação';
+    final mensagem = data['mensagem'] ?? data['message'] ?? data['body'] ?? '';
+    final tipo = data['tipo'] ?? data['type'] ?? 'info';
+    final id = data['id'] ?? DateTime.now().millisecondsSinceEpoch;
 
+    print('Processando notificação AWS: $titulo - $mensagem');
+
+    // Criar notificação local
+    showNotification(
+      id: id is int ? id : int.tryParse(id.toString()) ?? DateTime.now().millisecondsSinceEpoch,
+      title: titulo,
+      body: mensagem,
+      payload: jsonEncode(data),
+    );
+
+    // Formatar para callback
+    final notificacaoFormatada = {
+      'id': id,
+      'titulo': titulo,
+      'mensagem': mensagem,
+      'tipo': tipo,
+      'dataCriacao': DateTime.now().toIso8601String(),
+      'lida': false,
+      'payload': jsonEncode(data)
+    };
+
+    if (_onNotificationReceived != null) {
+      _onNotificationReceived!(notificacaoFormatada);
+    }
+  }
+
+  /// Manter compatibilidade com formato antigo
+  void _processLegacyNotification(Map<String, dynamic> notificationData) {
+    String? tipoEvento = notificationData['tipoEvento'] ??
+        notificationData['evento'] ??
+        notificationData['dadosEvento']?['evento'];
+
+    if (tipoEvento != null) {
+      if (tipoEvento == 'PEDIDO_DISPONIVEL') {
+        final pedidoId = notificationData['dadosEvento']?['dados']?['pedidoId'];
+
+        final notificacaoFormatada = {
+          'id': pedidoId ?? DateTime.now().millisecondsSinceEpoch,
+          'titulo': 'Novo pedido disponível',
+          'mensagem': notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
+          'dataCriacao': DateTime.now().toIso8601String(),
+          'lida': false,
+          'payload': jsonEncode(notificationData)
+        };
+
+        showNotification(
+          id: pedidoId ?? DateTime.now().millisecondsSinceEpoch,
+          title: 'Novo pedido disponível',
+          body: notificationData['mensagem'] ?? 'Pedido próximo à sua localização',
+          payload: jsonEncode(notificationData),
+        );
+
+        if (_onNotificationReceived != null) {
+          _onNotificationReceived!(notificacaoFormatada);
+        }
+      } else {
+        showNotification(
+          id: notificationData['id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: notificationData['titulo'] ?? 'Nova notificação',
+          body: notificationData['mensagem'] ?? '',
+        );
+      }
+    }
+  }
 
   void setNotificationCallback(Function(Map<String, dynamic>) callback) {
     _onNotificationReceived = callback;
@@ -213,7 +276,6 @@ class NotificationService {
       payload: payload,
     );
   }
-
 
   bool get isConnected => _isConnected;
 }
