@@ -21,8 +21,8 @@ class ApiService {
   String? _authToken;
 
   ApiService({String? apiGatewayUrl})
-        : this.apiGatewayUrl =
-              apiGatewayUrl ?? dotenv.env['API_GATEWAY_URL']!;
+      : this.apiGatewayUrl =
+      apiGatewayUrl ?? dotenv.env['API_GATEWAY_URL']!;
 
   set authToken(String? token) {
     _authToken = token;
@@ -34,7 +34,10 @@ class ApiService {
     final headers = {'Content-Type': 'application/json'};
 
     if (_authToken != null) {
+      print('Token presente, adicionando nos headers: $_authToken');
       headers['Authorization'] = 'Bearer $_authToken';
+    } else {
+      print('Nenhum token encontrado, headers seguem sem Authorization');
     }
 
     return headers;
@@ -45,7 +48,7 @@ class ApiService {
       _authToken = null;
 
       print("Iniciando login para: $email");
-      final baseUrl = apiGatewayUrl ?? 'https://j0dh1wfnjf.execute-api.us-east-1.amazonaws.com/prod';
+      final baseUrl = apiGatewayUrl;
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -151,7 +154,7 @@ class ApiService {
   Future<List<Pedido>> getPedidosByMotorista(int motoristaId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/motorista/$motoristaId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/motorista?motoristaId=$motoristaId'),
         headers: _authHeaders,
       );
 
@@ -211,10 +214,10 @@ class ApiService {
   Future<Pedido> getPedidoById(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/consulta/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/consulta?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
-
+      print(response.body);
       if (response.statusCode == 200) {
         return Pedido.fromJson(jsonDecode(response.body));
       } else {
@@ -260,7 +263,7 @@ class ApiService {
   Future<bool> cancelarPedido(int pedidoId) async {
     try {
       final response = await http.patch(
-        Uri.parse('$apiGatewayUrl/api/pedidos/acoes/cancelar/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/acoes/cancelar?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -299,7 +302,7 @@ class ApiService {
   Future<List<Notificacao>> buscarNotificacoes(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/destinatario/$userId'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/destinatario?userId=$userId'),
         headers: _authHeaders,
       );
 
@@ -325,7 +328,7 @@ class ApiService {
   Future<bool> marcarNotificacaoComoLida(int notificacaoId) async {
     try {
       final response = await http.patch(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/$notificacaoId/marcar-lida'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/marcar-lida?notificacaoId=$notificacaoId'),
         headers: _authHeaders,
       );
       return response.statusCode == 204;
@@ -339,7 +342,7 @@ class ApiService {
   Future<Map<String, dynamic>?> buscarPreferenciasNotificacao(int usuarioId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias-usuario/$usuarioId'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias-usuario?usuarioId=$usuarioId'),
         headers: _authHeaders,
       );
 
@@ -356,7 +359,7 @@ class ApiService {
   Future<Localizacao> getLocalizacaoPedido(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/pedido/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/pedido?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -373,7 +376,7 @@ class ApiService {
   Future<List<Localizacao>> getHistoricoLocalizacaoPedido(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/historico-pedido/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/historico-pedido?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -390,7 +393,7 @@ class ApiService {
 
   Future<bool> aceitarPedido(int pedidoId, int motoristaId, double latitude, double longitude) async {
     try {
-      final uri = Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/aceitar?motoristaId=$motoristaId&latitude=$latitude&longitude=$longitude');
+      final uri = Uri.parse('$apiGatewayUrl/api/pedidos/aceitar?pedidoId=$pedidoId&motoristaId=$motoristaId&latitude=$latitude&longitude=$longitude');
       final response = await http.post(
         uri,
         headers: _authHeaders,
@@ -424,7 +427,7 @@ class ApiService {
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/status'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/status?pedidoId=$pedidoId'),
       );
 
       _authHeaders.forEach((key, value) {
@@ -479,7 +482,7 @@ class ApiService {
   }
 
   Future confirmarEntrega(int pedidoId, int motoristaId) async {
-    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega/$pedidoId/?motoristaId=$motoristaId';
+    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega?pedidoId=$pedidoId&motoristaId=$motoristaId';
     try {
       final response = await http.post(
         Uri.parse(url),
@@ -499,7 +502,7 @@ class ApiService {
 
   Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File fotoColeta) async {
     try {
-      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/acao-coleta/$pedidoId/?motoristaId=$motoristaId');
+      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/acao-coleta?pedidoId=$pedidoId&motoristaId=$motoristaId');
       var request = http.MultipartRequest('POST', uri);
 
       _authHeaders.forEach((key, value) {
@@ -551,7 +554,7 @@ class ApiService {
       ) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/motorista/estatistica/$driverId?dataInicio=$dataInicio&dataFim=$dataFim'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/motorista/estatistica?driverId=$driverId&dataInicio=$dataInicio&dataFim=$dataFim'),
         headers: _authHeaders,
       );
 
