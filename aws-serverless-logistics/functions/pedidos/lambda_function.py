@@ -60,10 +60,8 @@ def handler(event, context):
 
 def get_pedidos_by_user(user_type, user_id, user_info):
     try:
-        # Validar se o usuário pode acessar os pedidos solicitados
         requested_user_id = int(user_id)
         authenticated_user_id = user_info['user_id']
-        print(requested_user_id )
         if requested_user_id != authenticated_user_id:
             return cors_response(403, {'message': 'Acesso negado aos pedidos deste usuário'})
 
@@ -82,20 +80,24 @@ def get_pedidos_by_user(user_type, user_id, user_info):
 
         pedidos = response.get('Items', [])
 
-        # Converter para formato compatível com Flutter
         formatted_pedidos = []
         for pedido in pedidos:
             formatted_pedidos.append({
                 'id': int(pedido['id']),
-                'origemLatitude': pedido['origemLatitude'],
-                'origemLongitude': pedido['origemLongitude'],
-                'destinoLatitude': pedido['destinoLatitude'],
-                'destinoLongitude': pedido['destinoLongitude'],
-                'tipoMercadoria': pedido['tipoMercadoria'],
-                'status': pedido['status'],
-                'clienteId': pedido.get('clienteId'),
-                'motoristaId': pedido.get('motoristaId'),
-                'dataCriacao': pedido['dataCriacao']
+                'origemLatitude': str(pedido['origemLatitude']),
+                'origemLongitude': str(pedido['origemLongitude']),
+                'destinoLatitude': str(pedido['destinoLatitude']),
+                'destinoLongitude': str(pedido['destinoLongitude']),
+                'tipoMercadoria': str(pedido['tipoMercadoria']),
+                'status': str(pedido['status']),
+                'clienteId': int(pedido.get('clienteId', 0)),
+                'motoristaId': int(pedido.get('motoristaId', 0)) if pedido.get('motoristaId') is not None else None,
+                'dataCriacao': str(pedido['dataCriacao']),
+                'dataAtualizacao': str(pedido.get('dataAtualizacao', pedido['dataCriacao'])),
+                'dataEntregaEstimada': str(pedido.get('dataEntregaEstimada')) if pedido.get('dataEntregaEstimada') else None,
+                'tempoEstimadoMinutos': int(pedido.get('tempoEstimadoMinutos', 0)),
+                'distanciaKm': float(pedido.get('distanciaKm', 0.0)),
+                'rotaMotorista': pedido.get('rotaMotorista')
             })
 
         return cors_response(200, json.loads(json.dumps(formatted_pedidos, cls=DecimalEncoder)))
@@ -104,99 +106,129 @@ def get_pedidos_by_user(user_type, user_id, user_info):
         print(f"Error getting pedidos: {str(e)}")
         return cors_response(500, {'message': f'Erro ao buscar pedidos: {str(e)}'})
 
-def get_pedido_by_id(pedido_id):
-    response = pedidos_table.get_item(Key={'id': str(pedido_id)})
 
-    if 'Item' not in response:
+def get_pedido_by_id(pedido_id):
+    try:
+        response = pedidos_table.get_item(Key={'id': str(pedido_id)})
+
+        if 'Item' not in response:
+            return {
+                'statusCode': 404,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'message': 'Pedido não encontrado'})
+            }
+
+        pedido = response['Item']
+        formatted_pedido = {
+            'id': int(pedido['id']),
+            'origemLatitude': str(pedido['origemLatitude']),
+            'origemLongitude': str(pedido['origemLongitude']),
+            'destinoLatitude': str(pedido['destinoLatitude']),
+            'destinoLongitude': str(pedido['destinoLongitude']),
+            'tipoMercadoria': str(pedido['tipoMercadoria']),
+            'status': str(pedido['status']),
+            'clienteId': int(pedido.get('clienteId', 0)),
+            'motoristaId': int(pedido.get('motoristaId', 0)) if pedido.get('motoristaId') is not None else None,
+            'dataCriacao': str(pedido['dataCriacao']),
+            'dataAtualizacao': str(pedido.get('dataAtualizacao', pedido['dataCriacao'])),
+            'dataEntregaEstimada': str(pedido.get('dataEntregaEstimada')) if pedido.get('dataEntregaEstimada') else None,
+            'tempoEstimadoMinutos': int(pedido.get('tempoEstimadoMinutos', 0)),
+            'distanciaKm': float(pedido.get('distanciaKm', 0.0)),
+            'rotaMotorista': pedido.get('rotaMotorista')
+        }
+
         return {
-            'statusCode': 404,
+            'statusCode': 200,
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
             },
-            'body': json.dumps({'message': 'Pedido não encontrado'})
+            'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
         }
 
-    pedido = response['Item']
-    formatted_pedido = {
-        'id': int(pedido['id']),
-        'origemLatitude': pedido['origemLatitude'],
-        'origemLongitude': pedido['origemLongitude'],
-        'destinoLatitude': pedido['destinoLatitude'],
-        'destinoLongitude': pedido['destinoLongitude'],
-        'tipoMercadoria': pedido['tipoMercadoria'],
-        'status': pedido['status'],
-        'clienteId': pedido.get('clienteId'),
-        'motoristaId': pedido.get('motoristaId'),
-        'dataCriacao': pedido['dataCriacao']
-    }
+    except Exception as e:
+        print(f"Error fetching pedido by ID: {str(e)}")
+        return cors_response(500, {'message': f'Erro ao buscar pedido: {str(e)}'})
 
-    return {
-        'statusCode': 200,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
-        'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
-    }
 
 def create_pedido(event):
-    body = json.loads(event['body'])
-
-    # Criar pedido
-    pedido_id = int(str(uuid.uuid4().int)[:10])
-
-    pedido = {
-        'id': str(pedido_id),
-        'origemLatitude': body['origemLatitude'],
-        'origemLongitude': body['origemLongitude'],
-        'destinoLatitude': body['destinoLatitude'],
-        'destinoLongitude': body['destinoLongitude'],
-        'tipoMercadoria': body['tipoMercadoria'],
-        'clienteId': body['clienteId'],
-        'status': 'AGUARDANDO_MOTORISTA',
-        'dataCriacao': str(datetime.utcnow())
-    }
-
-    # Salvar no DynamoDB
-    pedidos_table.put_item(Item=pedido)
-
-    # Enviar evento para SQS (notificações)
     try:
-        sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
-        if sqs_queue_url:
-            sqs.send_message(
-                QueueUrl=sqs_queue_url,
-                MessageBody=json.dumps({
-                    'event': 'pedido_created',
-                    'pedido_id': pedido_id,
-                    'cliente_id': body['clienteId']
-                })
-            )
+        body = json.loads(event['body'])
+
+        # Criar ID único
+        pedido_id = int(str(uuid.uuid4().int)[:10])
+        data_criacao = datetime.utcnow().isoformat()
+
+        pedido = {
+            'id': str(pedido_id),
+            'origemLatitude': str(body['origemLatitude']),
+            'origemLongitude': str(body['origemLongitude']),
+            'destinoLatitude': str(body['destinoLatitude']),
+            'destinoLongitude': str(body['destinoLongitude']),
+            'tipoMercadoria': str(body['tipoMercadoria']),
+            'clienteId': int(body['clienteId']),
+            'status': 'AGUARDANDO_MOTORISTA',
+            'dataCriacao': data_criacao,
+            'dataAtualizacao': data_criacao,
+            'dataEntregaEstimada': body.get('dataEntregaEstimada'),
+            'tempoEstimadoMinutos': int(body.get('tempoEstimadoMinutos', 0)),
+            'distanciaKm': float(body.get('distanciaKm', 0.0)),
+            'rotaMotorista': body.get('rotaMotorista')
+        }
+
+        # Salvar no DynamoDB
+        pedidos_table.put_item(Item=pedido)
+
+        # Enviar mensagem para SQS (se configurado)
+        try:
+            sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
+            if sqs_queue_url:
+                sqs.send_message(
+                    QueueUrl=sqs_queue_url,
+                    MessageBody=json.dumps({
+                        'event': 'pedido_created',
+                        'pedido_id': pedido_id,
+                        'cliente_id': pedido['clienteId']
+                    })
+                )
+        except Exception as e:
+            print(f"Error sending SQS message: {str(e)}")
+
+        # Resposta formatada
+        formatted_pedido = {
+            'id': pedido_id,
+            'origemLatitude': pedido['origemLatitude'],
+            'origemLongitude': pedido['origemLongitude'],
+            'destinoLatitude': pedido['destinoLatitude'],
+            'destinoLongitude': pedido['destinoLongitude'],
+            'tipoMercadoria': pedido['tipoMercadoria'],
+            'status': pedido['status'],
+            'clienteId': pedido['clienteId'],
+            'motoristaId': None,
+            'dataCriacao': pedido['dataCriacao'],
+            'dataAtualizacao': pedido['dataAtualizacao'],
+            'dataEntregaEstimada': pedido.get('dataEntregaEstimada'),
+            'tempoEstimadoMinutos': pedido['tempoEstimadoMinutos'],
+            'distanciaKm': pedido['distanciaKm'],
+            'rotaMotorista': pedido.get('rotaMotorista')
+        }
+
+        return {
+            'statusCode': 201,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
+        }
+
     except Exception as e:
-        print(f"Error sending SQS message: {str(e)}")
+        print(f"Erro ao criar pedido: {str(e)}")
+        return cors_response(500, {'message': f'Erro ao criar pedido: {str(e)}'})
 
-    # Retornar pedido no formato compatível
-    formatted_pedido = {
-        'id': pedido_id,
-        'origemLatitude': pedido['origemLatitude'],
-        'origemLongitude': pedido['origemLongitude'],
-        'destinoLatitude': pedido['destinoLatitude'],
-        'destinoLongitude': pedido['destinoLongitude'],
-        'tipoMercadoria': pedido['tipoMercadoria'],
-        'status': pedido['status'],
-        'clienteId': pedido['clienteId'],
-        'dataCriacao': pedido['dataCriacao']
-    }
-
-    return {
-        'statusCode': 201,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
-        'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
-    }
 
 def aceitar_pedido(event):
     path_parameters = event.get('pathParameters', {})

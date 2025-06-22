@@ -21,8 +21,8 @@ class ApiService {
   String? _authToken;
 
   ApiService({String? apiGatewayUrl})
-        : this.apiGatewayUrl =
-              apiGatewayUrl ?? dotenv.env['API_GATEWAY_URL']!;
+      : this.apiGatewayUrl =
+      apiGatewayUrl ?? dotenv.env['API_GATEWAY_URL']!;
 
   set authToken(String? token) {
     _authToken = token;
@@ -48,7 +48,7 @@ class ApiService {
       _authToken = null;
 
       print("Iniciando login para: $email");
-      final baseUrl = apiGatewayUrl ?? 'https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod';
+      final baseUrl = apiGatewayUrl;
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
