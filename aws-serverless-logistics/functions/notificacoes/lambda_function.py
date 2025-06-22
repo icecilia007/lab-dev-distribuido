@@ -54,7 +54,11 @@ def handle_api_request(event, context):
     
     if http_method == 'GET':
         if 'destinatario' in event.get('resource', ''):
-            return get_notifications(path_parameters['userId'], event.get('user'))
+            query_params = event.get('queryStringParameters', {}) or {}
+            user_id = query_params.get('userId')
+            if not user_id:
+                return cors_response(400, {'message': 'userId é obrigatório'})
+            return get_notifications(user_id, event.get('user'))
         elif 'contagem' in event.get('resource', ''):
             return get_unread_count(path_parameters['userId'], event.get('user'))
         elif 'preferencias' in event.get('resource', ''):
@@ -618,8 +622,17 @@ def get_notifications(user_id, user_info):
         if not user_info:
             return cors_response(401, {'message': 'Token inválido ou expirado'})
         
+        # Debug: log dos IDs para investigar mismatch
+        print(f"[DEBUG] Token user_info: {user_info}")
+        print(f"[DEBUG] Token user_id field: {user_info.get('user_id')} (type: {type(user_info.get('user_id'))})")
+        print(f"[DEBUG] Token id field: {user_info.get('id')} (type: {type(user_info.get('id'))})")
+        print(f"[DEBUG] Requested user_id: {user_id} (type: {type(user_id)})")
+        
         # Verificar se o usuário pode acessar as notificações do user_id solicitado
-        if str(user_info['id']) != str(user_id):
+        # O JWT payload usa 'user_id' como campo principal
+        token_user_id = str(user_info.get('user_id') or user_info.get('id') or user_info.get('userId', ''))
+        if token_user_id != str(user_id):
+            print(f"[DEBUG] Acesso negado: token_user_id={token_user_id}, requested_user_id={user_id}")
             return cors_response(403, {'message': 'Acesso negado. Você só pode visualizar suas próprias notificações'})
         
         response = notifications_table.scan(
@@ -656,8 +669,17 @@ def get_unread_count(user_id, user_info):
         if not user_info:
             return cors_response(401, {'message': 'Token inválido ou expirado'})
         
+        # Debug: log dos IDs para investigar mismatch
+        print(f"[DEBUG] get_unread_count - Token user_info: {user_info}")
+        print(f"[DEBUG] get_unread_count - Token user_id field: {user_info.get('user_id')} (type: {type(user_info.get('user_id'))})")
+        print(f"[DEBUG] get_unread_count - Token id field: {user_info.get('id')} (type: {type(user_info.get('id'))})")
+        print(f"[DEBUG] get_unread_count - Requested user_id: {user_id} (type: {type(user_id)})")
+        
         # Verificar se o usuário pode acessar as notificações do user_id solicitado
-        if str(user_info['id']) != str(user_id):
+        # O JWT payload usa 'user_id' como campo principal
+        token_user_id = str(user_info.get('user_id') or user_info.get('id') or user_info.get('userId', ''))
+        if token_user_id != str(user_id):
+            print(f"[DEBUG] get_unread_count - Acesso negado: token_user_id={token_user_id}, requested_user_id={user_id}")
             return cors_response(403, {'message': 'Acesso negado. Você só pode visualizar suas próprias notificações'})
         
         response = notifications_table.scan(
@@ -757,8 +779,17 @@ def get_preferences(user_id, user_info):
         if not user_info:
             return cors_response(401, {'message': 'Token inválido ou expirado'})
         
+        # Debug: log dos IDs para investigar mismatch
+        print(f"[DEBUG] get_preferences - Token user_info: {user_info}")
+        print(f"[DEBUG] get_preferences - Token user_id field: {user_info.get('user_id')} (type: {type(user_info.get('user_id'))})")
+        print(f"[DEBUG] get_preferences - Token id field: {user_info.get('id')} (type: {type(user_info.get('id'))})")
+        print(f"[DEBUG] get_preferences - Requested user_id: {user_id} (type: {type(user_id)})")
+        
         # Verificar se o usuário pode acessar as preferências do user_id solicitado
-        if str(user_info['id']) != str(user_id):
+        # O JWT payload usa 'user_id' como campo principal
+        token_user_id = str(user_info.get('user_id') or user_info.get('id') or user_info.get('userId', ''))
+        if token_user_id != str(user_id):
+            print(f"[DEBUG] get_preferences - Acesso negado: token_user_id={token_user_id}, requested_user_id={user_id}")
             return cors_response(403, {'message': 'Acesso negado. Você só pode visualizar suas próprias preferências'})
         
         response = users_table.get_item(Key={'id': str(user_id)})

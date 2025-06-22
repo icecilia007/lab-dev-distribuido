@@ -9,7 +9,14 @@ from auth_utils import validate_jwt_token, cors_response
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
 pedidos_table = dynamodb.Table(os.environ.get('PEDIDOS_TABLE', 'dev-logistics-pedidos'))
+from decimal import Decimal
 
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
 def handler(event, context):
     try:
         # Validar JWT token para todas as rotas exceto OPTIONS
@@ -91,7 +98,7 @@ def get_pedidos_by_user(user_type, user_id, user_info):
                 'dataCriacao': pedido['dataCriacao']
             })
 
-        return cors_response(200, formatted_pedidos)
+        return cors_response(200, json.loads(json.dumps(formatted_pedidos, cls=DecimalEncoder)))
 
     except Exception as e:
         print(f"Error getting pedidos: {str(e)}")
@@ -130,7 +137,7 @@ def get_pedido_by_id(pedido_id):
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
         },
-        'body': json.dumps(formatted_pedido)
+        'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
     }
 
 def create_pedido(event):
@@ -188,7 +195,7 @@ def create_pedido(event):
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
         },
-        'body': json.dumps(formatted_pedido)
+        'body': json.dumps(formatted_pedido, cls=DecimalEncoder)
     }
 
 def aceitar_pedido(event):

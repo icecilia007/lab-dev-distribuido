@@ -302,7 +302,7 @@ class ApiService {
   Future<List<Notificacao>> buscarNotificacoes(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/destinatario/$userId'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/destinatario?userId=$userId'),
         headers: _authHeaders,
       );
 

@@ -386,7 +386,7 @@ module "api_gateway" {
           method             = "POST"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
-          integration_uri    = module.auth_lambda.arn
+          integration_uri    = module.usuarios_lambda.arn
           integration_method = "POST"
           status_code        = "201"
           use_mock_response  = false
@@ -400,7 +400,7 @@ module "api_gateway" {
           method             = "POST"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
-          integration_uri    = module.auth_lambda.arn
+          integration_uri    = module.usuarios_lambda.arn
           integration_method = "POST"
           status_code        = "201"
           use_mock_response  = false
@@ -414,7 +414,7 @@ module "api_gateway" {
           method             = "POST"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
-          integration_uri    = module.auth_lambda.arn
+          integration_uri    = module.usuarios_lambda.arn
           integration_method = "POST"
           status_code        = "201"
           use_mock_response  = false
@@ -554,7 +554,7 @@ module "api_gateway" {
           request_parameters = {}
         },
         {
-          path               = "notificacoes/destinatario/{userId}"
+          path               = "notificacoes/destinatario"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -566,7 +566,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.userId" = true
+            "method.request.querystring.userId" = true
           }
         },
         {
