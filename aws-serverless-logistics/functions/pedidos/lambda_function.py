@@ -2,10 +2,7 @@ import json
 import boto3
 import uuid
 import os
-import sys
-import jwt
 from datetime import datetime
-from boto3.dynamodb.conditions import Key
 
 from auth_utils import validate_jwt_token, cors_response
 
@@ -20,19 +17,19 @@ def handler(event, context):
             user_payload = validate_jwt_token(event)
             if not user_payload:
                 return cors_response(401, {'message': 'Token inválido ou expirado'})
-            
+
             # Adicionar informações do usuário ao evento
             event['user'] = user_payload
-        
+
         http_method = event['httpMethod']
         path_parameters = event.get('pathParameters', {})
-        
+
         if http_method == 'GET' and path_parameters:
             if 'userType' in path_parameters and 'userId' in path_parameters:
                 return get_pedidos_by_user(path_parameters['userType'], path_parameters['userId'], event['user'])
             elif 'pedidoId' in path_parameters:
                 return get_pedido_by_id(path_parameters['pedidoId'])
-                
+
         elif http_method == 'POST':
             if 'aceitar' in event.get('resource', ''):
                 return aceitar_pedido(event)
@@ -40,29 +37,29 @@ def handler(event, context):
                 return cancelar_pedido(path_parameters['pedidoId'])
             else:
                 return create_pedido(event)
-                
+
         elif http_method == 'PATCH' and 'cancelar' in event.get('resource', ''):
             return cancelar_pedido(path_parameters['pedidoId'])
-        
+
         elif http_method == 'OPTIONS':
             return cors_response(200, {})
-        
+
         return cors_response(405, {'message': 'Method not allowed'})
-        
+
     except Exception as e:
         print(f"Error in pedidos lambda: {str(e)}")
         return cors_response(500, {'message': f'Erro: {str(e)}'})
-    
+
 
 def get_pedidos_by_user(user_type, user_id, user_info):
     try:
         # Validar se o usuário pode acessar os pedidos solicitados
         requested_user_id = int(user_id)
         authenticated_user_id = user_info['user_id']
-        
+        print(requested_user_id )
         if requested_user_id != authenticated_user_id:
             return cors_response(403, {'message': 'Acesso negado aos pedidos deste usuário'})
-        
+
         if user_type == 'cliente':
             response = pedidos_table.scan(
                 FilterExpression='clienteId = :client_id',
@@ -75,9 +72,9 @@ def get_pedidos_by_user(user_type, user_id, user_info):
             )
         else:
             return cors_response(400, {'message': 'Tipo de usuário inválido'})
-        
+
         pedidos = response.get('Items', [])
-        
+
         # Converter para formato compatível com Flutter
         formatted_pedidos = []
         for pedido in pedidos:
@@ -93,16 +90,16 @@ def get_pedidos_by_user(user_type, user_id, user_info):
                 'motoristaId': pedido.get('motoristaId'),
                 'dataCriacao': pedido['dataCriacao']
             })
-        
+
         return cors_response(200, formatted_pedidos)
-        
+
     except Exception as e:
         print(f"Error getting pedidos: {str(e)}")
         return cors_response(500, {'message': f'Erro ao buscar pedidos: {str(e)}'})
 
 def get_pedido_by_id(pedido_id):
     response = pedidos_table.get_item(Key={'id': str(pedido_id)})
-    
+
     if 'Item' not in response:
         return {
             'statusCode': 404,
@@ -112,7 +109,7 @@ def get_pedido_by_id(pedido_id):
             },
             'body': json.dumps({'message': 'Pedido não encontrado'})
         }
-    
+
     pedido = response['Item']
     formatted_pedido = {
         'id': int(pedido['id']),
@@ -126,7 +123,7 @@ def get_pedido_by_id(pedido_id):
         'motoristaId': pedido.get('motoristaId'),
         'dataCriacao': pedido['dataCriacao']
     }
-    
+
     return {
         'statusCode': 200,
         'headers': {
@@ -138,10 +135,10 @@ def get_pedido_by_id(pedido_id):
 
 def create_pedido(event):
     body = json.loads(event['body'])
-    
+
     # Criar pedido
     pedido_id = int(str(uuid.uuid4().int)[:10])
-    
+
     pedido = {
         'id': str(pedido_id),
         'origemLatitude': body['origemLatitude'],
@@ -153,10 +150,10 @@ def create_pedido(event):
         'status': 'AGUARDANDO_MOTORISTA',
         'dataCriacao': str(datetime.utcnow())
     }
-    
+
     # Salvar no DynamoDB
     pedidos_table.put_item(Item=pedido)
-    
+
     # Enviar evento para SQS (notificações)
     try:
         sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
@@ -171,7 +168,7 @@ def create_pedido(event):
             )
     except Exception as e:
         print(f"Error sending SQS message: {str(e)}")
-    
+
     # Retornar pedido no formato compatível
     formatted_pedido = {
         'id': pedido_id,
@@ -184,7 +181,7 @@ def create_pedido(event):
         'clienteId': pedido['clienteId'],
         'dataCriacao': pedido['dataCriacao']
     }
-    
+
     return {
         'statusCode': 201,
         'headers': {
@@ -197,12 +194,12 @@ def create_pedido(event):
 def aceitar_pedido(event):
     path_parameters = event.get('pathParameters', {})
     query_parameters = event.get('queryStringParameters', {})
-    
+
     pedido_id = path_parameters.get('pedidoId')
     motorista_id = query_parameters.get('motoristaId')
     latitude = query_parameters.get('latitude')
     longitude = query_parameters.get('longitude')
-    
+
     # Atualizar pedido
     pedidos_table.update_item(
         Key={'id': str(pedido_id)},
@@ -214,7 +211,7 @@ def aceitar_pedido(event):
             ':data': str(datetime.utcnow())
         }
     )
-    
+
     return {
         'statusCode': 200,
         'headers': {
@@ -234,7 +231,7 @@ def cancelar_pedido(pedido_id):
             ':data': str(datetime.utcnow())
         }
     )
-    
+
     return {
         'statusCode': 204,
         'headers': {

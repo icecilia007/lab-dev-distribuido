@@ -11,6 +11,7 @@ import '../models/user.dart';
 import 'database_service.dart';
 import 'dart:io';
 import 'package:http_parser/http_parser.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
 
@@ -168,7 +169,7 @@ class ApiService {
   Future<List<Pedido>> getPedidosByCliente(int clienteId, userType) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/usuario-info/$userType/$clienteId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/usuario-info?userType=$userType&userId=$clienteId'),
         headers: _authHeaders,
       );
 

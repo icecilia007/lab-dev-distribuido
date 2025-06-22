@@ -443,7 +443,7 @@ module "api_gateway" {
         request_parameters = {}
       },
       {
-        path               = "pedidos/usuario-info/{userType}/{userId}"
+        path               = "pedidos/usuario-info"
         method             = "GET"
         auth_type          = "NONE"
         integration_type   = "AWS_PROXY"
