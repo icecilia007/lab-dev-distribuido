@@ -20,7 +20,8 @@ class ApiService {
   String? _authToken;
 
   ApiService({String? apiGatewayUrl})
-      : this.apiGatewayUrl = apiGatewayUrl ?? 'https://j0dh1wfnjf.execute-api.us-east-1.amazonaws.com/prod';
+        : this.apiGatewayUrl =
+              apiGatewayUrl ?? dotenv.env['API_GATEWAY_URL']!;
 
   set authToken(String? token) {
     _authToken = token;

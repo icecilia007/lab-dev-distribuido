@@ -1,7 +1,8 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:app/models/notificacao.dart';
 import 'package:app/manager/notification_manager.dart';
 import 'screens/login_screen.dart';
@@ -12,11 +13,14 @@ import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'screens/driver/driver_home_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final apiService = ApiService( apiGatewayUrl: 'https://j0dh1wfnjf.execute-api.us-east-1.amazonaws.com/prod',);
+  await dotenv.load();
+
+  final apiService = ApiService(
+    apiGatewayUrl: dotenv.env['API_GATEWAY_URL'],
+  );
   final authService = AuthService(apiService);
   final notificationService = NotificationService();
   final notificationManager = NotificationManager(apiService);
@@ -34,7 +38,6 @@ void main() async {
       print('Erro ao processar notificação: $e');
     }
   });
-
 
   runApp(
     MultiProvider(
