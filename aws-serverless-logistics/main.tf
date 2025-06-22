@@ -472,7 +472,7 @@ module "api_gateway" {
           }
         },
         {
-          path               = "pedidos/consulta/{pedidoId}"
+          path               = "pedidos/consulta"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -484,7 +484,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.pedidoId" = true
+            "method.request.querystring.pedidoId" = true
           }
         },
         {

@@ -5,12 +5,22 @@ from functools import wraps
 
 def validate_jwt_token(event):
     try:
-        headers = event.get('headers', {})
+        # Verificação defensiva para event None ou sem headers
+        if not event:
+            print("[DEBUG] Event é None")
+            return None
+            
+        headers = event.get('headers') if event else None
+        if not headers:
+            print("[DEBUG] Headers não encontrados no event")
+            return None
+            
+        print(f"[DEBUG] Headers: {headers}")
+        
         auth_header = (headers.get('Authorization') or
                        headers.get('authorization') or
                        headers.get('x-amzn-remapped-authorization'))
 
-        print(f"[DEBUG] Headers: {headers}")
         print(f"[DEBUG] Authorization header: {auth_header}")
 
         if not auth_header or not auth_header.startswith('Bearer '):
@@ -18,7 +28,7 @@ def validate_jwt_token(event):
             return None
 
         token = auth_header.split(' ')[1]
-        secret_key = os.environ.get('JWT_SECRET', 'your-secret-key')
+        secret_key = os.environ.get('JWT_SECRET')
 
         print(f"[DEBUG] Usando JWT_SECRET: {secret_key[:5]}***")  # nunca imprima tudo
 

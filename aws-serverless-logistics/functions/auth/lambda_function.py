@@ -51,7 +51,7 @@ def handler(event, context):
             'exp': datetime.utcnow() + timedelta(hours=24)
         }
         
-        secret_key = os.environ.get('JWT_SECRET', 'your-secret-key')
+        secret_key = os.environ.get('JWT_SECRET')
         token = jwt.encode(payload, secret_key, algorithm='HS256')
         
         # Retorna mesmo formato que Java
@@ -60,14 +60,16 @@ def handler(event, context):
             'headers': {
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {token}',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Expose-Headers': 'Authorization'
             },
             'body': json.dumps({
                 'id': int(user['id']),
                 'nome': user['nome'],
                 'email': user['email'],
                 'tipo': user['tipo'],
-                'telefone': user.get('telefone')
+                'telefone': user.get('telefone'),
+                'token': token
             })
         }
         

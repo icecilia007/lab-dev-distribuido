@@ -125,11 +125,11 @@ resource "aws_api_gateway_resource" "variable_resources" {
 }
 
 resource "aws_api_gateway_authorizer" "cognito_authorizer" {
-  count         = local.is_rest_api && local.use_cognito_or_jwt ? 1 : 0
+  count         = local.is_rest_api && local.use_cognito_or_jwt && var.cognito_user_pool_arn != null ? 1 : 0
   name          = "${var.TagEnv}-${var.TagProject}-cognito-authorizer"
   rest_api_id   = aws_api_gateway_rest_api.rest_api[0].id
   type          = "COGNITO_USER_POOLS"
-  provider_arns = var.cognito_user_pool_arn != null ? [var.cognito_user_pool_arn] : ["arn:aws:cognito-idp:${var.region}:123456789012:userpool/${var.cognito_user_pool_id}"]
+  provider_arns = [var.cognito_user_pool_arn]
 }
 
 resource "aws_api_gateway_method" "rest_endpoint_methods" {
@@ -138,7 +138,7 @@ resource "aws_api_gateway_method" "rest_endpoint_methods" {
   resource_id        = local.method_resource_mappings[each.key]
   http_method        = each.value.method
   authorization      = each.value.auth_type == "NONE" ? "NONE" : each.value.auth_type == "API_KEY" ? "NONE" : "COGNITO_USER_POOLS"
-  authorizer_id      = each.value.auth_type == "COGNITO" || each.value.auth_type == "JWT" ? aws_api_gateway_authorizer.cognito_authorizer[0].id : null
+  authorizer_id      = each.value.auth_type == "NONE" ? null : (each.value.auth_type == "COGNITO" || each.value.auth_type == "JWT") ? aws_api_gateway_authorizer.cognito_authorizer[0].id : null
   api_key_required   = each.value.auth_type == "API_KEY"
   request_parameters = each.value.request_parameters
 }

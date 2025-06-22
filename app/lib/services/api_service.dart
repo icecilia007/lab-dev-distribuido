@@ -214,10 +214,10 @@ class ApiService {
   Future<Pedido> getPedidoById(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/consulta/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/consulta?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
-
+      print(response.body);
       if (response.statusCode == 200) {
         return Pedido.fromJson(jsonDecode(response.body));
       } else {
