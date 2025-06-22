@@ -128,7 +128,7 @@ Future<User> login(String email, String password) async {
     _authToken = null;
 
     print("Iniciando login para: $email");
-    final baseUrl = apiGatewayUrl ?? 'https://aq72n5uzcb.execute-api.us-east-1.amazonaws.com/prod';
+    final baseUrl = apiGatewayUrl ?? 'https://j0dh1wfnjf.execute-api.us-east-1.amazonaws.com/prod';
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/login'),
       headers: {'Content-Type': 'application/json'},

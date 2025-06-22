@@ -13,7 +13,7 @@ class WebSocketAWSService {
   String? _connectionId;
   
   // URL do WebSocket AWS - substitua pelo seu WebSocket API Gateway
-  static const String _websocketUrl = 'wss://23b38pazkc.execute-api.us-east-1.amazonaws.com/prod';
+  static const String _websocketUrl = '"wss://zdrx3nubek.execute-api.us-east-1.amazonaws.com/prod';
   
   // Callbacks para notificações
   Function(Map<String, dynamic>)? onMessageReceived;

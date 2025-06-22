@@ -16,7 +16,7 @@ class NotificationService {
   Function(Map<String, dynamic>)? _onNotificationReceived;
 
   // URL do WebSocket AWS (substitua pelo seu WebSocket ID)
-  static const String _awsWebSocketUrl = 'wss://23b38pazkc.execute-api.us-east-1.amazonaws.com/prod';
+  static const String _awsWebSocketUrl = '"wss://zdrx3nubek.execute-api.us-east-1.amazonaws.com/prod';
 
   Future init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
