@@ -4,34 +4,32 @@ import os
 from functools import wraps
 
 def validate_jwt_token(event):
-    """
-    Valida o token JWT presente nos headers da requisição
-    Retorna o payload do token ou None se inválido
-    """
     try:
         headers = event.get('headers', {})
-
-        # Tentar diferentes variações do header Authorization
         auth_header = (headers.get('Authorization') or
                        headers.get('authorization') or
                        headers.get('x-amzn-remapped-authorization'))
 
-        if not auth_header:
-            return None
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Authorization header: {auth_header}")
 
-        if not auth_header.startswith('Bearer '):
+        if not auth_header or not auth_header.startswith('Bearer '):
+            print("[DEBUG] Header ausente ou malformado")
             return None
 
         token = auth_header.split(' ')[1]
         secret_key = os.environ.get('JWT_SECRET', 'your-secret-key')
 
-        # Decodificar e validar o token
+        print(f"[DEBUG] Usando JWT_SECRET: {secret_key[:5]}***")  # nunca imprima tudo
+
         payload = jwt.decode(token, secret_key, algorithms=['HS256'])
         return payload
 
     except jwt.ExpiredSignatureError:
+        print("[DEBUG] Token expirado")
         return None
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        print(f"[DEBUG] Token inválido: {str(e)}")
         return None
     except Exception as e:
         print(f"Error validating JWT: {str(e)}")

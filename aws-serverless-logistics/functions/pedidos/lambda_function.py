@@ -22,13 +22,13 @@ def handler(event, context):
             event['user'] = user_payload
 
         http_method = event['httpMethod']
+        query_params = event.get('queryStringParameters', {})
         path_parameters = event.get('pathParameters', {})
 
-        if http_method == 'GET' and path_parameters:
-            if 'userType' in path_parameters and 'userId' in path_parameters:
-                return get_pedidos_by_user(path_parameters['userType'], path_parameters['userId'], event['user'])
-            elif 'pedidoId' in path_parameters:
-                return get_pedido_by_id(path_parameters['pedidoId'])
+        if http_method == 'GET' and 'userType' in query_params and 'userId' in query_params:
+            return get_pedidos_by_user(query_params['userType'], query_params['userId'], event['user'])
+        elif http_method == 'GET' and 'pedidoId' in path_parameters:
+            return get_pedido_by_id(path_parameters['pedidoId'])
 
         elif http_method == 'POST':
             if 'aceitar' in event.get('resource', ''):

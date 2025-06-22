@@ -13,24 +13,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Variables
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
-}
-
-variable "project_name" {
-  description = "Project name"
-  type        = string
-  default     = "logistics"
-}
 
 # Local variables
 locals {
@@ -166,7 +148,7 @@ module "auth_lambda" {
   
   environment_variables = {
     USERS_TABLE = module.users_table.name
-    JWT_SECRET  = "your-jwt-secret-key"
+    JWT_SECRET  = var.jwt_secret
   }
   
   additional_policies = [
@@ -208,7 +190,7 @@ module "pedidos_lambda" {
   TagProject     = var.project_name
   lambda_name    = "pedidos"
   folder         = "aws-serverless-logistics/functions/pedidos"
-  files          = ["Dockerfile", "lambda_function.py", "requirements.txt"]
+  files          = ["Dockerfile", "lambda_function.py", "requirements.txt", "auth_utils.py"]
   aws_region     = var.aws_region
   tag_image      = "latest"
   memory         = 512
@@ -218,6 +200,7 @@ module "pedidos_lambda" {
   environment_variables = {
     PEDIDOS_TABLE  = module.pedidos_table.name
     SQS_QUEUE_URL  = module.events_queue.url
+    JWT_SECRET            = var.jwt_secret
   }
   
   additional_policies = [
@@ -251,6 +234,7 @@ module "notificacoes_lambda" {
     SNS_REGIONAL_TOPIC_ARN = module.notifications_regional_topic.arn
     WEBSOCKET_LAMBDA_NAME  = module.websocket_lambda.name
     CONNECTIONS_TABLE      = module.websocket_connections_table.name
+    JWT_SECRET  = var.jwt_secret
   }
   
   additional_policies = [
@@ -308,7 +292,7 @@ module "websocket_lambda" {
   
   environment_variables = {
     CONNECTIONS_TABLE      = module.websocket_connections_table.name
-    JWT_SECRET            = "your-jwt-secret-key"
+    JWT_SECRET            = var.jwt_secret
     WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket_api.id}.execute-api.${var.aws_region}.amazonaws.com/prod"
   }
   
@@ -382,350 +366,338 @@ module "api_gateway" {
   routes = {
     main_path = "api"
     methods = [
-
-      # Auth
-      {
-        path               = "auth/login"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.auth_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "auth/registro-cliente"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.usuarios_lambda.arn
-        integration_method = "POST"
-        status_code        = "201"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "auth/registro-motorista"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.usuarios_lambda.arn
-        integration_method = "POST"
-        status_code        = "201"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-
-      # Pedidos
-      {
-        path               = "pedidos"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.pedidos_lambda.arn
-        integration_method = "POST"
-        status_code        = "201"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "pedidos/usuario-info"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.pedidos_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "pedidos/consulta/{pedidoId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.pedidos_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "pedidos/acoes-aceitar/{pedidoId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.pedidos_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "pedidos/acoes/cancelar/{pedidoId}"
-        method             = "PATCH"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.pedidos_lambda.arn
-        integration_method = "POST"
-        status_code        = "204"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-
-      # Notificações
-      {
-        path               = "notificacoes/destinatario/{userId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.notificacoes_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "notificacoes/{notificationId}/marcar-lida"
-        method             = "PATCH"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.notificacoes_lambda.arn
-        integration_method = "POST"
-        status_code        = "204"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "notificacoes/preferencias"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.notificacoes_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "notificacoes/preferencias-usuario/{userId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.notificacoes_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "notificacoes/nao-lidas/contagem/{userId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.notificacoes_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-
-      # Rastreamento
-      {
-        path               = "rastreamento/status-pedido/{pedidoId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "rastreamento/historico-pedido/{pedidoId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "rastreamento/acao-coleta/{pedidoId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "rastreamento/acao-entrega/{pedidoId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "rastreamento/registrar-localizacao"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "rastreamento/motorista/estatisticas/{driverId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.rastreamento_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "smart-routing/buscar-motoristas"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.smart_routing_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "smart-routing/oferta-motorista/{pedidoId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.smart_routing_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "smart-routing/oferta-aceitar/{ofertaId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.smart_routing_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "smart-routing/oferta-rejeitar/{ofertaId}"
-        method             = "POST"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.smart_routing_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      },
-      {
-        path               = "smart-routing/ofertas-por-motorista/{motoristaId}"
-        method             = "GET"
-        auth_type          = "NONE"
-        integration_type   = "AWS_PROXY"
-        integration_uri    = module.smart_routing_lambda.arn
-        integration_method = "POST"
-        status_code        = "200"
-        use_mock_response  = false
-        mock_template      = ""
-        api_key_required   = false
-        authorization      = "NONE"
-        request_parameters = {}
-      }
+        # Auth routes
+        {
+          path               = "auth/login"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.auth_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "auth/registro-cliente"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.auth_lambda.arn
+          integration_method = "POST"
+          status_code        = "201"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "auth/registro-motorista"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.auth_lambda.arn
+          integration_method = "POST"
+          status_code        = "201"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "auth/registro-operador"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.auth_lambda.arn
+          integration_method = "POST"
+          status_code        = "201"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        # Pedidos routes
+        {
+          path               = "pedidos"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "201"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "pedidos/motorista/{motoristaId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.motoristaId" = true
+          }
+        },
+        {
+          path               = "pedidos/usuario-info"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.querystring.userType" = true
+            "method.request.querystring.userId" = true
+          }
+        },
+        {
+          path               = "pedidos/consulta/{pedidoId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.pedidoId" = true
+          }
+        },
+        {
+          path               = "pedidos/acoes/cancelar/{pedidoId}"
+          method             = "PATCH"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "204"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.pedidoId" = true
+          }
+        },
+        {
+          path               = "pedidos/aceitar"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.querystring.pedidoId" = true
+            "method.request.querystring.motoristaId" = true
+            "method.request.querystring.latitude" = true
+            "method.request.querystring.longitude" = true
+          }
+        },
+        {
+          path               = "pedidos/status"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.pedidos_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.querystring.pedidoId" = true
+          }
+        },
+        # Notificações routes
+        {
+          path               = "notificacoes/preferencias"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.notificacoes_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "notificacoes/destinatario/{userId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.notificacoes_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.userId" = true
+          }
+        },
+        {
+          path               = "notificacoes/{notificacaoId}/marcar-lida"
+          method             = "PATCH"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.notificacoes_lambda.arn
+          integration_method = "POST"
+          status_code        = "204"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.notificacaoId" = true
+          }
+        },
+        {
+          path               = "notificacoes/preferencias-usuario/{usuarioId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.notificacoes_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.usuarioId" = true
+          }
+        },
+        # Rastreamento routes
+        {
+          path               = "rastreamento/pedido/{pedidoId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.pedidoId" = true
+          }
+        },
+        {
+          path               = "rastreamento/historico-pedido/{pedidoId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.pedidoId" = true
+          }
+        },
+        {
+          path               = "rastreamento/registrar-localizacao"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        },
+        {
+          path               = "rastreamento/acao-coleta/{pedidoId}"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.pedidoId" = true
+            "method.request.querystring.motoristaId" = true
+          }
+        },
+        {
+          path               = "rastreamento/motorista/estatistica/{driverId}"
+          method             = "GET"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "200"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {
+            "method.request.path.driverId" = true
+            "method.request.querystring.dataInicio" = true
+            "method.request.querystring.dataFim" = true
+          }
+        },
+        # Incidentes route
+        {
+          path               = "incidentes"
+          method             = "POST"
+          auth_type          = "NONE"
+          integration_type   = "AWS_PROXY"
+          integration_uri    = module.rastreamento_lambda.arn
+          integration_method = "POST"
+          status_code        = "201"
+          use_mock_response  = false
+          mock_template      = ""
+          api_key_required   = false
+          authorization      = "NONE"
+          request_parameters = {}
+        }
     ]
   }
 

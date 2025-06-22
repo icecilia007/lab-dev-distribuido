@@ -34,7 +34,10 @@ class ApiService {
     final headers = {'Content-Type': 'application/json'};
 
     if (_authToken != null) {
+      print('Token presente, adicionando nos headers: $_authToken');
       headers['Authorization'] = 'Bearer $_authToken';
+    } else {
+      print('Nenhum token encontrado, headers seguem sem Authorization');
     }
 
     return headers;
@@ -45,7 +48,7 @@ class ApiService {
       _authToken = null;
 
       print("Iniciando login para: $email");
-      final baseUrl = apiGatewayUrl ?? 'https://j0dh1wfnjf.execute-api.us-east-1.amazonaws.com/prod';
+      final baseUrl = apiGatewayUrl ?? 'https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod';
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -390,7 +393,7 @@ class ApiService {
 
   Future<bool> aceitarPedido(int pedidoId, int motoristaId, double latitude, double longitude) async {
     try {
-      final uri = Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/aceitar?motoristaId=$motoristaId&latitude=$latitude&longitude=$longitude');
+      final uri = Uri.parse('$apiGatewayUrl/api/pedidos/aceitar?pedidoId=$pedidoId&motoristaId=$motoristaId&latitude=$latitude&longitude=$longitude');
       final response = await http.post(
         uri,
         headers: _authHeaders,
@@ -424,7 +427,7 @@ class ApiService {
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('$apiGatewayUrl/api/pedidos/$pedidoId/status'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/status?pedidoId=$pedidoId'),
       );
 
       _authHeaders.forEach((key, value) {

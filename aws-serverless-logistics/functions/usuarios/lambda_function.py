@@ -44,12 +44,12 @@ def register_user(event):
     
     # Determinar tipo de usuário baseado no path
     resource_path = event.get('resource', '')
-    user_tipo = 'CLIENTE'  # default
+    user_tipo = 'cliente'  # default
     
     if 'motorista' in resource_path:
-        user_tipo = 'MOTORISTA'
+        user_tipo = 'motorista'
     elif 'operador' in resource_path:
-        user_tipo = 'OPERADOR'
+        user_tipo = 'operador'
     
     # Hash da senha
     hashed_password = bcrypt.hashpw(
@@ -77,7 +77,7 @@ def register_user(event):
             'veiculo_tipo': body.get('veiculo_tipo'),
             'veiculo_placa': body.get('veiculo_placa')
         })
-    elif user_tipo == 'CLIENTE':
+    elif user_tipo == 'cliente':
         user_item.update({
             'endereco': body.get('endereco'),
             'cidade': body.get('cidade')

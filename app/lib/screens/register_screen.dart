@@ -83,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       // Usar os métodos específicos do ApiService
       switch (_tipoUsuarioSelecionado) {
-        case 'cliente':
+        case lower('cliente'):
           success = await widget.apiService.registrarCliente(userData);
           break;
         case 'motorista':

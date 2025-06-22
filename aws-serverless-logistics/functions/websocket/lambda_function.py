@@ -63,13 +63,15 @@ def handle_connect(event, connection_id):
         # Extrair token JWT dos headers ou query parameters
         headers = event.get('headers') or {}
         auth_header = headers.get('Authorization') or headers.get('authorization')
-        
+        query_token = (event.get('queryStringParameters') or {}).get('token')
+
         token = None
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header[7:]
-        elif query_params.get('token'):
-            token = query_params.get('token')
-        
+        elif query_token:
+            token = query_token.replace('Bearer ', '')
+
+
         if token:
             try:
                 # Validar JWT
