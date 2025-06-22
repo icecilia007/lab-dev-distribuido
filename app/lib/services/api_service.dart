@@ -154,7 +154,7 @@ class ApiService {
   Future<List<Pedido>> getPedidosByMotorista(int motoristaId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/pedidos/motorista/$motoristaId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/motorista?motoristaId=$motoristaId'),
         headers: _authHeaders,
       );
 
@@ -263,7 +263,7 @@ class ApiService {
   Future<bool> cancelarPedido(int pedidoId) async {
     try {
       final response = await http.patch(
-        Uri.parse('$apiGatewayUrl/api/pedidos/acoes/cancelar/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/pedidos/acoes/cancelar?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -328,7 +328,7 @@ class ApiService {
   Future<bool> marcarNotificacaoComoLida(int notificacaoId) async {
     try {
       final response = await http.patch(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/$notificacaoId/marcar-lida'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/marcar-lida?notificacaoId=$notificacaoId'),
         headers: _authHeaders,
       );
       return response.statusCode == 204;
@@ -342,7 +342,7 @@ class ApiService {
   Future<Map<String, dynamic>?> buscarPreferenciasNotificacao(int usuarioId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias-usuario/$usuarioId'),
+        Uri.parse('$apiGatewayUrl/api/notificacoes/preferencias-usuario?usuarioId=$usuarioId'),
         headers: _authHeaders,
       );
 
@@ -359,7 +359,7 @@ class ApiService {
   Future<Localizacao> getLocalizacaoPedido(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/pedido/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/pedido?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -376,7 +376,7 @@ class ApiService {
   Future<List<Localizacao>> getHistoricoLocalizacaoPedido(int pedidoId) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/historico-pedido/$pedidoId'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/historico-pedido?pedidoId=$pedidoId'),
         headers: _authHeaders,
       );
 
@@ -482,7 +482,7 @@ class ApiService {
   }
 
   Future confirmarEntrega(int pedidoId, int motoristaId) async {
-    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega/$pedidoId/?motoristaId=$motoristaId';
+    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega/?pedidoId=$pedidoId&motoristaId=$motoristaId';
     try {
       final response = await http.post(
         Uri.parse(url),
@@ -502,7 +502,7 @@ class ApiService {
 
   Future<bool> confirmarColetaComFoto(int pedidoId, int motoristaId, File fotoColeta) async {
     try {
-      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/acao-coleta/$pedidoId/?motoristaId=$motoristaId');
+      var uri = Uri.parse('$apiGatewayUrl/api/rastreamento/acao-coleta?pedidoId=$pedidoId&motoristaId=$motoristaId');
       var request = http.MultipartRequest('POST', uri);
 
       _authHeaders.forEach((key, value) {
@@ -554,7 +554,7 @@ class ApiService {
       ) async {
     try {
       final response = await http.get(
-        Uri.parse('$apiGatewayUrl/api/rastreamento/motorista/estatistica/$driverId?dataInicio=$dataInicio&dataFim=$dataFim'),
+        Uri.parse('$apiGatewayUrl/api/rastreamento/motorista/estatistica?driverId=$driverId&dataInicio=$dataInicio&dataFim=$dataFim'),
         headers: _authHeaders,
       );
 
