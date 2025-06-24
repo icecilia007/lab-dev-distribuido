@@ -93,3 +93,6 @@ resource "aws_dynamodb_table_item" "example" {
   range_key  = var.sort_key != "" ? var.sort_key : null
   item       = var.example_item
 }
+
+# Tabelas de notificações removidas do módulo base
+# Serão criadas em módulo específico para evitar duplicação

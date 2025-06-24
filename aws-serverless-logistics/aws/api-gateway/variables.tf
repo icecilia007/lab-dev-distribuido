@@ -171,3 +171,22 @@ variable "cognito_user_pool_issuer" {
   description = "URL do emissor do Cognito User Pool para autenticação JWT"
   default     = null
 }
+
+# Variáveis para WebSocket API
+variable "enable_websocket" {
+  type        = bool
+  description = "Habilitar WebSocket API para notificações em tempo real"
+  default     = false
+}
+
+variable "websocket_lambda_arn" {
+  type        = string
+  description = "ARN da Lambda function que processa WebSocket"
+  default     = null
+}
+
+variable "websocket_lambda_name" {
+  type        = string
+  description = "Nome da Lambda function que processa WebSocket"
+  default     = null
+}

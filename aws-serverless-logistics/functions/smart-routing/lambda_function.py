@@ -9,6 +9,7 @@ from typing import List, Dict, Tuple
 # AWS Services
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
+sns = boto3.client('sns')  # Adicionar SNS
 lambda_client = boto3.client('lambda')
 
 # Tables
@@ -169,9 +170,9 @@ def handle_pedido_disponivel(message):
     
     pedido = pedido_response['Item']
     
-    # Extrair localização de origem
-    origem_lat = float(pedido.get('origem_latitude', 0))
-    origem_lng = float(pedido.get('origem_longitude', 0))
+    # Extrair localização de origem - tentar tanto os campos do message quanto do pedido
+    origem_lat = float(message.get('origem_latitude', pedido.get('origemLatitude', 0)))
+    origem_lng = float(message.get('origem_longitude', pedido.get('origemLongitude', 0)))
     
     if origem_lat == 0 or origem_lng == 0:
         print(f"Pedido {pedido_id} missing location data")
@@ -198,6 +199,10 @@ def handle_pedido_disponivel(message):
     if motoristas_proximos:
         # Criar ofertas para os motoristas selecionados
         criar_ofertas_para_motoristas(pedido_id, motoristas_proximos)
+        
+        # Enviar notificação WebSocket para todos os motoristas próximos
+        motorista_ids = [m['motorista_id'] for m in motoristas_proximos]
+        enviar_notificacao_multiplos_motoristas(pedido_id, pedido, motorista_ids)
     else:
         print(f"No drivers available for pedido {pedido_id}")
         # Notificar sistema que não há motoristas disponíveis
@@ -211,10 +216,10 @@ def buscar_motoristas_disponiveis(lat: float, lng: float, raio_inicial_km: float
         # Scan table for available drivers
         # Em produção, usaria uma GSI com geohash para otimizar
         response = users_table.scan(
-            FilterExpression='#type = :user_type AND disponibilidade = :disponivel',
-            ExpressionAttributeNames={'#type': 'type'},
+            FilterExpression='#tipo = :user_type AND disponibilidade = :disponivel',
+            ExpressionAttributeNames={'#tipo': 'tipo'},
             ExpressionAttributeValues={
-                ':user_type': 'MOTORISTA',
+                ':user_type': 'motorista',
                 ':disponivel': 'DISPONIVEL'
             }
         )
@@ -326,6 +331,80 @@ def criar_ofertas_para_motoristas(pedido_id: str, motoristas_proximos: List[Dict
     except Exception as e:
         print(f"Error creating offers: {str(e)}")
 
+def enviar_notificacao_multiplos_motoristas(pedido_id: str, pedido: Dict, motorista_ids: List[str]):
+    """
+    Enviar notificação PEDIDO_DISPONIVEL para múltiplos motoristas via WebSocket
+    Compatível com o padrão da aplicação Java de notificações
+    """
+    try:
+        # Preparar notificação no formato do Java consumer
+        notification = {
+            'tipo': 'PEDIDO_DISPONIVEL',
+            'titulo': 'Novo Pedido Disponível! 🚚',
+            'conteudo': f'Há um novo pedido disponível para coleta em {pedido.get("origemEndereco", "local de coleta")}',
+            'dadosEvento': {
+                'evento': 'PEDIDO_DISPONIVEL',
+                'origem': 'smart-routing',
+                'dados': {
+                    'pedidoId': pedido_id,
+                    'origemEndereco': pedido.get('origemEndereco', ''),
+                    'destinoEndereco': pedido.get('destinoEndereco', ''),
+                    'tipoMercadoria': pedido.get('tipoMercadoria', ''),
+                    'motoristasProximos': motorista_ids,
+                    'timestamp': str(datetime.utcnow())
+                }
+            }
+        }
+        
+        # Publicar evento PEDIDO_DISPONIVEL no SNS (compatível com Java)
+        try:
+            sns_topic_arn = os.environ.get('SNS_GENERAL_TOPIC_ARN')
+            if sns_topic_arn:
+                evento_message = {
+                    'evento': 'PEDIDO_DISPONIVEL',
+                    'origem': 'smart-routing',
+                    'timestamp': str(datetime.utcnow()),
+                    'dados': notification['dadosEvento']['dados']
+                }
+                
+                sns.publish(
+                    TopicArn=sns_topic_arn,
+                    Message=json.dumps(evento_message),
+                    MessageAttributes={
+                        'evento': {
+                            'DataType': 'String',
+                            'StringValue': 'PEDIDO_DISPONIVEL'
+                        },
+                        'origem': {
+                            'DataType': 'String',
+                            'StringValue': 'smart-routing'
+                        }
+                    }
+                )
+                print("Evento PEDIDO_DISPONIVEL publicado no SNS")
+        except Exception as e:
+            print(f"Erro ao publicar evento PEDIDO_DISPONIVEL: {str(e)}")
+        
+        # Enviar via Lambda de WebSocket para todos os motoristas numa única chamada
+        websocket_lambda_name = os.environ.get('WEBSOCKET_LAMBDA_NAME', 'dev-logistics-websocket')
+        
+        payload = {
+            'action': 'send_notification',
+            'userIds': [int(mid) for mid in motorista_ids],  # Múltiplos usuários
+            'notification': notification
+        }
+        
+        lambda_client.invoke(
+            FunctionName=websocket_lambda_name,
+            InvocationType='Event',  # Asíncrono
+            Payload=json.dumps(payload)
+        )
+        
+        print(f"PEDIDO_DISPONIVEL notification sent to {len(motorista_ids)} drivers via WebSocket")
+        
+    except Exception as e:
+        print(f"Error sending notification to multiple drivers: {str(e)}")
+
 def enviar_notificacao_oferta_motorista(motorista_id: str, pedido_id: str, oferta: Dict):
     """
     Enviar notificação de nova oferta para motorista
@@ -338,39 +417,41 @@ def enviar_notificacao_oferta_motorista(motorista_id: str, pedido_id: str, ofert
         
         pedido = pedido_response['Item']
         
-        # Preparar notificação
+        # Preparar notificação compatível com WebSocket API Gateway
         notification = {
             'tipo': 'PEDIDO_DISPONIVEL',
             'titulo': 'Novo Pedido Disponível! 🚚',
             'conteudo': f'Pedido #{pedido_id} - {oferta["distancia_km"]:.1f}km de distância. Expires em 2 min!',
             'dadosEvento': {
                 'evento': 'PEDIDO_DISPONIVEL',
-                'pedidoId': pedido_id,
-                'motoristaId': motorista_id,
-                'ofertaId': oferta['id'],
+                'origem': 'smart-routing',
                 'dados': {
+                    'pedidoId': pedido_id,
+                    'motoristaId': motorista_id,
+                    'ofertaId': oferta['id'],
                     'distancia_km': oferta['distancia_km'],
                     'tempo_estimado_min': oferta['tempo_estimado_min'],
                     'valor_estimado': pedido.get('valor_total', 0),
-                    'origem': pedido.get('origem_endereco', ''),
-                    'destino': pedido.get('destino_endereco', ''),
+                    'origemEndereco': pedido.get('origemEndereco', ''),
+                    'destinoEndereco': pedido.get('destinoEndereco', ''),
                     'data_expiracao': oferta['data_expiracao'],
-                    'timestamp': str(datetime.utcnow())
+                    'timestamp': str(datetime.utcnow()),
+                    'motoristasProximos': [motorista_id]  # Para compatibilidade com o consumer Java
                 }
             }
         }
         
-        # Enviar via Lambda de notificações
-        notificacoes_lambda_name = os.environ.get('NOTIFICACOES_LAMBDA_NAME', 'dev-logistics-notificacoes')
+        # Enviar via Lambda de WebSocket 
+        websocket_lambda_name = os.environ.get('WEBSOCKET_LAMBDA_NAME', 'dev-logistics-websocket')
         
         payload = {
-            'action': 'send_driver_offer',
-            'motorista_id': motorista_id,
+            'action': 'send_notification',
+            'userId': int(motorista_id),
             'notification': notification
         }
         
         lambda_client.invoke(
-            FunctionName=notificacoes_lambda_name,
+            FunctionName=websocket_lambda_name,
             InvocationType='Event',  # Asíncrono
             Payload=json.dumps(payload)
         )
@@ -587,15 +668,26 @@ def notificar_sem_motoristas_disponiveis(pedido_id: str, cliente_id: str):
         # Enviar evento via SQS
         sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
         if sqs_queue_url:
-            sqs.send_message(
-                QueueUrl=sqs_queue_url,
-                MessageBody=json.dumps({
-                    'event': 'sem_motoristas_disponiveis',
-                    'pedido_id': pedido_id,
-                    'cliente_id': cliente_id,
-                    'timestamp': str(datetime.utcnow())
-                })
-            )
+            message_body = json.dumps({
+                'event': 'sem_motoristas_disponiveis',
+                'pedido_id': pedido_id,
+                'cliente_id': cliente_id,
+                'timestamp': str(datetime.utcnow())
+            })
+            
+            # Detectar se é fila FIFO
+            if sqs_queue_url.endswith('.fifo'):
+                sqs.send_message(
+                    QueueUrl=sqs_queue_url,
+                    MessageBody=message_body,
+                    MessageGroupId='sem-motoristas',
+                    MessageDeduplicationId=f"sem_motoristas_{pedido_id}_{int(datetime.utcnow().timestamp())}"
+                )
+            else:
+                sqs.send_message(
+                    QueueUrl=sqs_queue_url,
+                    MessageBody=message_body
+                )
             
     except Exception as e:
         print(f"Error notifying no drivers available: {str(e)}")

@@ -9,6 +9,7 @@ from auth_utils import validate_jwt_token, cors_response
 
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
+sns = boto3.client('sns')  # Adicionar SNS para eventos
 pedidos_table = dynamodb.Table(os.environ.get('PEDIDOS_TABLE', 'dev-logistics-pedidos'))
 
 
@@ -204,18 +205,42 @@ def create_pedido(event):
         # Salvar no DynamoDB
         pedidos_table.put_item(Item=pedido)
 
-        # Enviar mensagem para SQS (se configurado)
+        # Publicar evento PEDIDO_CRIADO (compatível com RabbitMQ Java)
+        try:
+            publicar_evento_pedido('PEDIDO_CRIADO', pedido_id, pedido, body)
+        except Exception as e:
+            print(f"Error publishing PEDIDO_CRIADO event: {str(e)}")
+
+        # Enviar mensagem para SQS (se configurado) - manter compatibilidade
         try:
             sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
             if sqs_queue_url:
-                sqs.send_message(
-                    QueueUrl=sqs_queue_url,
-                    MessageBody=json.dumps({
-                        'event': 'pedido_created',
-                        'pedido_id': pedido_id,
-                        'cliente_id': pedido['clienteId']
-                    })
-                )
+                message_body = json.dumps({
+                    'event': 'pedido_created',
+                    'pedido_id': pedido_id,
+                    'cliente_id': pedido['clienteId'],
+                    'origem_latitude': pedido['origemLatitude'],
+                    'origem_longitude': pedido['origemLongitude'],
+                    'destino_latitude': pedido['destinoLatitude'],
+                    'destino_longitude': pedido['destinoLongitude'],
+                    'tipo_mercadoria': pedido['tipoMercadoria'],
+                    'origem_endereco': body.get('origemEndereco', ''),
+                    'destino_endereco': body.get('destinoEndereco', '')
+                })
+                
+                # Verificar se é fila FIFO (tem .fifo no final)
+                if sqs_queue_url.endswith('.fifo'):
+                    sqs.send_message(
+                        QueueUrl=sqs_queue_url,
+                        MessageBody=message_body,
+                        MessageGroupId='pedidos',  # Agrupar todos os pedidos
+                        MessageDeduplicationId=f"pedido_{pedido_id}_{int(datetime.utcnow().timestamp())}"
+                    )
+                else:
+                    sqs.send_message(
+                        QueueUrl=sqs_queue_url,
+                        MessageBody=message_body
+                    )
         except Exception as e:
             print(f"Error sending SQS message: {str(e)}")
 
@@ -272,6 +297,18 @@ def aceitar_pedido(event):
             ':data': str(datetime.utcnow())
         }
     )
+    
+    # Publicar evento STATUS_ATUALIZADO
+    try:
+        pedido_atualizado = {
+            'id': str(pedido_id),
+            'motoristaId': int(motorista_id),
+            'status': 'EM_ROTA',
+            'dataAceite': str(datetime.utcnow())
+        }
+        publicar_evento_pedido('STATUS_ATUALIZADO', int(pedido_id), pedido_atualizado, {})
+    except Exception as e:
+        print(f"Error publishing STATUS_ATUALIZADO event: {str(e)}")
 
     return {
         'statusCode': 200,
@@ -292,6 +329,17 @@ def cancelar_pedido(pedido_id):
             ':data': str(datetime.utcnow())
         }
     )
+    
+    # Publicar evento PEDIDO_CANCELADO
+    try:
+        pedido_cancelado = {
+            'id': str(pedido_id),
+            'status': 'CANCELADO',
+            'dataCancelamento': str(datetime.utcnow())
+        }
+        publicar_evento_pedido('PEDIDO_CANCELADO', int(pedido_id), pedido_cancelado, {'motivo': 'Cancelado pelo sistema'})
+    except Exception as e:
+        print(f"Error publishing PEDIDO_CANCELADO event: {str(e)}")
 
     return {
         'statusCode': 204,
@@ -301,3 +349,64 @@ def cancelar_pedido(pedido_id):
         },
         'body': ''
     }
+
+def publicar_evento_pedido(evento: str, pedido_id: int, pedido: dict, body: dict):
+    """
+    Publica evento no SNS Topic - replica PedidoEventSender do Java
+    """
+    try:
+        sns_topic_arn = os.environ.get('SNS_TOPIC_ARN')
+        if not sns_topic_arn:
+            print("SNS_TOPIC_ARN não configurado")
+            return
+        
+        # Estrutura da mensagem compatível com EventoConsumer Java
+        dados = {
+            'pedidoId': pedido_id,
+            'clienteId': pedido['clienteId'],
+            'origemLatitude': pedido['origemLatitude'],
+            'origemLongitude': pedido['origemLongitude'],
+            'destinoLatitude': pedido['destinoLatitude'],
+            'destinoLongitude': pedido['destinoLongitude'],
+            'tipoMercadoria': pedido['tipoMercadoria'],
+            'status': pedido['status'],
+            'dataCriacao': pedido['dataCriacao'],
+            'tempoEstimadoMinutos': pedido.get('tempoEstimadoMinutos', 0),
+            'distanciaKm': float(pedido.get('distanciaKm', 0.0)),
+            'origemEndereco': body.get('origemEndereco', ''),
+            'destinoEndereco': body.get('destinoEndereco', '')
+        }
+        
+        if evento == 'STATUS_ATUALIZADO':
+            dados['novoStatus'] = pedido['status']
+            dados['motoristaId'] = pedido.get('motoristaId')
+        elif evento == 'PEDIDO_CANCELADO':
+            dados['motivo'] = body.get('motivo', 'Cancelado pelo cliente')
+        
+        mensagem = {
+            'evento': evento,
+            'origem': 'pedidos',
+            'timestamp': datetime.utcnow().isoformat(),
+            'dados': dados
+        }
+        
+        # Publicar no SNS com message attributes para filtering
+        sns.publish(
+            TopicArn=sns_topic_arn,
+            Message=json.dumps(mensagem, cls=DecimalEncoder),
+            MessageAttributes={
+                'evento': {
+                    'DataType': 'String',
+                    'StringValue': evento
+                },
+                'origem': {
+                    'DataType': 'String', 
+                    'StringValue': 'pedidos'
+                }
+            }
+        )
+        
+        print(f"Evento {evento} publicado no SNS para pedido {pedido_id}")
+        
+    except Exception as e:
+        print(f"Erro ao publicar evento {evento}: {str(e)}")

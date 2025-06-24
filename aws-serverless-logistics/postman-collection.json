@@ -1,0 +1,379 @@
+{
+	"info": {
+		"name": "AWS Serverless Logistics API",
+		"description": "Collection for testing the AWS Serverless Logistics API Gateway endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod/api",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string",
+			"description": "JWT token obtained from login"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{authToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    console.log('Login successful, response headers:', pm.response.headers);",
+									"    ",
+									"    // Try to get token from multiple header locations",
+									"    const authHeader = pm.response.headers.get('Authorization');",
+									"    const remappedHeader = pm.response.headers.get('x-amzn-Remapped-Authorization');",
+									"    const xAuthHeader = pm.response.headers.get('x-amzn-remapped-authorization');",
+									"    ",
+									"    console.log('Authorization header:', authHeader);",
+									"    console.log('x-amzn-Remapped-Authorization header:', remappedHeader);",
+									"    console.log('x-amzn-remapped-authorization header:', xAuthHeader);",
+									"    ",
+									"    const tokenHeader = authHeader || remappedHeader || xAuthHeader;",
+									"    ",
+									"    if (tokenHeader && tokenHeader.startsWith('Bearer ')) {",
+									"        const token = tokenHeader.substring(7);",
+									"        pm.environment.set('authToken', token);",
+									"        pm.globals.set('authToken', token);",
+									"        pm.collectionVariables.set('authToken', token);",
+									"        console.log('✅ Token saved from header:', token.substring(0, 50) + '...');",
+									"    } else {",
+									"        // Fallback: try to get token from response body if it contains one",
+									"        try {",
+									"            const responseJson = pm.response.json();",
+									"            if (responseJson.token) {",
+									"                const token = responseJson.token;",
+									"                pm.environment.set('authToken', token);",
+									"                pm.globals.set('authToken', token);",
+									"                pm.collectionVariables.set('authToken', token);",
+									"                console.log('✅ Token saved from body:', token.substring(0, 50) + '...');",
+									"            } else {",
+									"                console.log('❌ No token found in response body or headers');",
+									"                console.log('Response body:', JSON.stringify(responseJson, null, 2));",
+									"            }",
+									"        } catch (e) {",
+									"            console.log('❌ Error parsing response:', e.message);",
+									"        }",
+									"    }",
+									"} else {",
+									"    console.log('❌ Login failed with status:', pm.response.code);",
+									"    console.log('Response:', pm.response.text());",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"ari@gmail.com\",\n    \"senha\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Registro Cliente",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"nome\": \"João Silva\",\n    \"email\": \"joao@gmail.com\",\n    \"senha\": \"123456\",\n    \"telefone\": \"11999999999\",\n    \"tipo\": \"cliente\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/registro-cliente",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "registro-cliente"]
+						}
+					}
+				},
+				{
+					"name": "Registro Motorista",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"nome\": \"Carlos Motorista\",\n    \"email\": \"carlos@gmail.com\",\n    \"senha\": \"123456\",\n    \"telefone\": \"11888888888\",\n    \"tipo\": \"motorista\",\n    \"cnh\": \"12345678901\",\n    \"veiculo\": \"Moto Honda\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/registro-motorista",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "registro-motorista"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Pedidos",
+			"item": [
+				{
+					"name": "Criar Pedido",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"origemEndereco\": \"Rua A, 123\",\n    \"origemLatitude\": \"-23.5505\",\n    \"origemLongitude\": \"-46.6333\",\n    \"destinoEndereco\": \"Rua B, 456\",\n    \"destinoLatitude\": \"-23.5489\",\n    \"destinoLongitude\": \"-46.6388\",\n    \"descricao\": \"Entrega urgente\",\n    \"peso\": 2.5,\n    \"valor\": 25.00\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/pedidos",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos"]
+						}
+					}
+				},
+				{
+					"name": "Consultar Pedido por ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/consulta/8860534895",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "consulta", "8860534895"]
+						}
+					}
+				},
+				{
+					"name": "Listar Pedidos por Usuário",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/usuario-info?userType=cliente&userId=8516440892",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "usuario-info"],
+							"query": [
+								{
+									"key": "userType",
+									"value": "cliente"
+								},
+								{
+									"key": "userId",
+									"value": "8516440892"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Listar Pedidos por Motorista",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/motorista/1234567890",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "motorista", "1234567890"]
+						}
+					}
+				},
+				{
+					"name": "Aceitar Pedido",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pedidoId\": \"8860534895\",\n    \"motoristaId\": \"1234567890\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/aceitar",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "aceitar"]
+						}
+					}
+				},
+				{
+					"name": "Cancelar Pedido",
+					"request": {
+						"method": "PATCH",
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/acoes/cancelar/8860534895",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "acoes", "cancelar", "8860534895"]
+						}
+					}
+				},
+				{
+					"name": "Atualizar Status do Pedido",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pedidoId\": \"8860534895\",\n    \"novoStatus\": \"em_transito\",\n    \"latitude\": \"-23.5505\",\n    \"longitude\": \"-46.6333\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/pedidos/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["pedidos", "status"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notificações",
+			"item": [
+				{
+					"name": "Listar Notificações por Usuário",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/notificacoes/usuario/8516440892",
+							"host": ["{{baseUrl}}"],
+							"path": ["notificacoes", "usuario", "8516440892"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Rastreamento",
+			"item": [
+				{
+					"name": "Rastrear Pedido",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/rastreamento/pedido/8860534895",
+							"host": ["{{baseUrl}}"],
+							"path": ["rastreamento", "pedido", "8860534895"]
+						}
+					}
+				},
+				{
+					"name": "Rastrear Pedido com Motorista",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/rastreamento/pedido/8860534895?motoristaId=1234567890",
+							"host": ["{{baseUrl}}"],
+							"path": ["rastreamento", "pedido", "8860534895"],
+							"query": [
+								{
+									"key": "motoristaId",
+									"value": "1234567890"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Estatísticas do Motorista",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/rastreamento/motorista/estatistica/1234567890?dataInicio=2024-01-01&dataFim=2024-12-31",
+							"host": ["{{baseUrl}}"],
+							"path": ["rastreamento", "motorista", "estatistica", "1234567890"],
+							"query": [
+								{
+									"key": "dataInicio",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "dataFim",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Incidentes",
+			"item": [
+				{
+					"name": "Criar Incidente",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pedidoId\": \"8860534895\",\n    \"tipo\": \"atraso\",\n    \"descricao\": \"Trânsito intenso na região\",\n    \"latitude\": \"-23.5505\",\n    \"longitude\": \"-46.6333\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/incidentes",
+							"host": ["{{baseUrl}}"],
+							"path": ["incidentes"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

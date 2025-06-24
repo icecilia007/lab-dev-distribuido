@@ -1,0 +1,110 @@
+{
+	"info": {
+		"name": "AWS Logistics - WORKING ✅",
+		"description": "Collection que funciona 100% com auto-token",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod/api",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "🔐 Login (Execute PRIMEIRO)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    console.log('✅ Login successful!');",
+							"    ",
+							"    // Get token from body (guaranteed to work)",
+							"    try {",
+							"        const responseBody = pm.response.json();",
+							"        if (responseBody.token) {",
+							"            const token = responseBody.token;",
+							"            pm.collectionVariables.set('authToken', token);",
+							"            pm.environment.set('authToken', token);",
+							"            pm.globals.set('authToken', token);",
+							"            console.log('✅ Token saved from BODY:', token.substring(0, 50) + '...');",
+							"            console.log('📋 FULL TOKEN:', token);",
+							"        }",
+							"    } catch (e) {",
+							"        console.log('❌ Error getting token from body:', e);",
+							"    }",
+							"    ",
+							"    // Also try from remapped header",
+							"    const remappedHeader = pm.response.headers.get('x-amzn-Remapped-Authorization');",
+							"    if (remappedHeader && remappedHeader.startsWith('Bearer ')) {",
+							"        const headerToken = remappedHeader.substring(7);",
+							"        console.log('✅ Token also found in HEADER:', headerToken.substring(0, 50) + '...');",
+							"    }",
+							"    ",
+							"    console.log('🎯 Ready to test other endpoints!');",
+							"} else {",
+							"    console.log('❌ Login failed:', pm.response.status);",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"ari@gmail.com\",\n    \"senha\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["auth", "login"]
+				}
+			}
+		},
+		{
+			"name": "✅ Consultar Pedido (TESTE)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/pedidos/consulta/2477065696",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos", "consulta", "2477065696"]
+				}
+			}
+		},
+		{
+			"name": "❌ Teste SEM Token (deve dar erro)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/pedidos/consulta/2477065696",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos", "consulta", "2477065696"]
+				}
+			}
+		}
+	]
+}

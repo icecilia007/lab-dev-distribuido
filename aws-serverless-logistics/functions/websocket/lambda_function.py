@@ -225,11 +225,16 @@ def handle_direct_notification(event):
     """
     try:
         user_id = event.get('userId')
+        user_ids = event.get('userIds')  # Para múltiplos usuários
         notification = event.get('notification')
         
-        if not user_id or not notification:
-            print("Missing userId or notification in direct invocation")
-            return {'statusCode': 400, 'body': 'Missing required parameters'}
+        if not notification:
+            print("Missing notification in direct invocation")
+            return {'statusCode': 400, 'body': 'Missing notification parameter'}
+        
+        if not user_id and not user_ids:
+            print("Missing userId or userIds in direct invocation")
+            return {'statusCode': 400, 'body': 'Missing userId or userIds parameter'}
         
         # Setup API Gateway Management API endpoint from environment
         websocket_api_endpoint = os.environ.get('WEBSOCKET_API_ENDPOINT')
@@ -240,13 +245,21 @@ def handle_direct_notification(event):
         global apigateway
         apigateway = boto3.client('apigatewaymanagementapi', endpoint_url=websocket_api_endpoint)
         
-        # Send notification to user
-        success = send_notification_to_user(user_id, notification)
-        
-        return {
-            'statusCode': 200 if success else 404,
-            'body': f'Notification {"sent" if success else "failed - no connections"}'
-        }
+        # Send notification to user(s)
+        if user_ids:
+            # Múltiplos usuários
+            success_count = send_notification_to_multiple_users(user_ids, notification)
+            return {
+                'statusCode': 200 if success_count > 0 else 404,
+                'body': f'Notification sent to {success_count}/{len(user_ids)} users'
+            }
+        else:
+            # Usuário único
+            success = send_notification_to_user(user_id, notification)
+            return {
+                'statusCode': 200 if success else 404,
+                'body': f'Notification {"sent" if success else "failed - no connections"}'
+            }
         
     except Exception as e:
         print(f"Error in handle_direct_notification: {str(e)}")

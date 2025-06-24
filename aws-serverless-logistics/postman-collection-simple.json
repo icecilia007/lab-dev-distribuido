@@ -1,0 +1,130 @@
+{
+	"info": {
+		"name": "AWS Logistics API - Simple",
+		"description": "Simplified collection with manual token setup",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod/api",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "COLE_SEU_TOKEN_AQUI",
+			"type": "string",
+			"description": "Copie o token do header Authorization da resposta do login"
+		}
+	],
+	"item": [
+		{
+			"name": "1️⃣ Login (sem auth)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"ari@gmail.com\",\n    \"senha\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["auth", "login"]
+				},
+				"description": "Execute este request primeiro. Depois copie o token do header 'Authorization' da resposta e cole na variável 'authToken' da collection."
+			}
+		},
+		{
+			"name": "2️⃣ Consultar Pedido por ID",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/pedidos/consulta/8860534895",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos", "consulta", "8860534895"]
+				},
+				"description": "Testa a consulta de pedido que estava dando erro 403"
+			}
+		},
+		{
+			"name": "3️⃣ Criar Pedido",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"origemEndereco\": \"Rua A, 123\",\n    \"origemLatitude\": \"-23.5505\",\n    \"origemLongitude\": \"-46.6333\",\n    \"destinoEndereco\": \"Rua B, 456\",\n    \"destinoLatitude\": \"-23.5489\",\n    \"destinoLongitude\": \"-46.6388\",\n    \"descricao\": \"Entrega teste\",\n    \"peso\": 2.5,\n    \"valor\": 25.00\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/pedidos",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos"]
+				}
+			}
+		},
+		{
+			"name": "4️⃣ Listar Pedidos por Usuário",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/pedidos/usuario-info?userType=cliente&userId=8516440892",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos", "usuario-info"],
+					"query": [
+						{
+							"key": "userType",
+							"value": "cliente"
+						},
+						{
+							"key": "userId",
+							"value": "8516440892"
+						}
+					]
+				}
+			}
+		},
+		{
+			"name": "5️⃣ Teste sem Token (deve dar erro)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/pedidos/consulta/8860534895",
+					"host": ["{{baseUrl}}"],
+					"path": ["pedidos", "consulta", "8860534895"]
+				},
+				"description": "Este request deve retornar 'Missing Authentication Token' - isso confirma que a autenticação está funcionando"
+			}
+		}
+	]
+}

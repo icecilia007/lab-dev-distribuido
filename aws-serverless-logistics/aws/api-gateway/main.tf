@@ -351,3 +351,91 @@ resource "aws_apigatewayv2_stage" "http_stage" {
     }
   )
 }
+
+# WebSocket API - compatível com sistema Java de notificações
+resource "aws_apigatewayv2_api" "websocket_api" {
+  count         = var.enable_websocket ? 1 : 0
+  name          = "${var.TagEnv}-${var.TagProject}-websocket"
+  protocol_type = "WEBSOCKET"
+  route_selection_expression = "$request.body.action"
+  description   = "WebSocket API para notificações em tempo real - compatível com Java"
+
+  tags = merge(
+    var.tags,
+    {
+      Name        = "${var.TagEnv}-${var.TagProject}-websocket"
+      Environment = var.TagEnv
+      Project     = var.TagProject
+      Type        = "WebSocket"
+    }
+  )
+}
+
+# Integração com Lambda WebSocket
+resource "aws_apigatewayv2_integration" "websocket_integration" {
+  count                    = var.enable_websocket ? 1 : 0
+  api_id                   = aws_apigatewayv2_api.websocket_api[0].id
+  integration_type         = "AWS_PROXY"
+  integration_uri          = var.websocket_lambda_arn
+  integration_method       = "POST"
+}
+
+# Rotas WebSocket
+resource "aws_apigatewayv2_route" "websocket_connect" {
+  count     = var.enable_websocket ? 1 : 0
+  api_id    = aws_apigatewayv2_api.websocket_api[0].id
+  route_key = "$connect"
+  authorization_type = "NONE"  # Autenticação via JWT no handler da Lambda
+  target    = "integrations/${aws_apigatewayv2_integration.websocket_integration[0].id}"
+}
+
+resource "aws_apigatewayv2_route" "websocket_disconnect" {
+  count     = var.enable_websocket ? 1 : 0
+  api_id    = aws_apigatewayv2_api.websocket_api[0].id
+  route_key = "$disconnect"
+  authorization_type = "NONE"
+  target    = "integrations/${aws_apigatewayv2_integration.websocket_integration[0].id}"
+}
+
+resource "aws_apigatewayv2_route" "websocket_default" {
+  count     = var.enable_websocket ? 1 : 0
+  api_id    = aws_apigatewayv2_api.websocket_api[0].id
+  route_key = "$default"
+  authorization_type = "NONE"
+  target    = "integrations/${aws_apigatewayv2_integration.websocket_integration[0].id}"
+}
+
+# Stage para WebSocket
+resource "aws_apigatewayv2_stage" "websocket_stage" {
+  count       = var.enable_websocket ? 1 : 0
+  api_id      = aws_apigatewayv2_api.websocket_api[0].id
+  name        = var.stage_name
+  auto_deploy = true
+
+  # Configurações de throttling e logging
+  default_route_settings {
+    throttling_burst_limit = 5000
+    throttling_rate_limit  = 2000
+    logging_level         = "INFO"
+    data_trace_enabled    = true
+  }
+
+  tags = merge(
+    var.tags,
+    {
+      Name        = "${var.TagEnv}-${var.TagProject}-websocket-stage"
+      Environment = var.TagEnv
+      Project     = var.TagProject
+    }
+  )
+}
+
+# IAM Role para Lambda access do API Gateway WebSocket
+resource "aws_lambda_permission" "websocket_lambda_permission" {
+  count         = var.enable_websocket ? 1 : 0
+  statement_id  = "AllowWebSocketAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.websocket_lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.websocket_api[0].execution_arn}/*/*"
+}

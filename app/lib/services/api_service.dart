@@ -482,7 +482,7 @@ class ApiService {
   }
 
   Future confirmarEntrega(int pedidoId, int motoristaId) async {
-    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega/?pedidoId=$pedidoId&motoristaId=$motoristaId';
+    final url = '$apiGatewayUrl/api/rastreamento/acao-entrega?pedidoId=$pedidoId&motoristaId=$motoristaId';
     try {
       final response = await http.post(
         Uri.parse(url),

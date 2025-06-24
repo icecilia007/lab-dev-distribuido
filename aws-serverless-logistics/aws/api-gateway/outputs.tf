@@ -51,3 +51,24 @@ output "authorizer_id" {
   description = "ID do autorizador JWT/Cognito, se criado"
   value       = local.is_rest_api && local.use_cognito_or_jwt ? aws_api_gateway_authorizer.cognito_authorizer[0].id : (local.is_http_api && local.use_cognito_or_jwt ? aws_apigatewayv2_authorizer.jwt_authorizer[0].id : null)
 }
+
+# Outputs específicos para WebSocket
+output "websocket_api_id" {
+  description = "ID da WebSocket API"
+  value       = var.enable_websocket ? aws_apigatewayv2_api.websocket_api[0].id : null
+}
+
+output "websocket_api_endpoint" {
+  description = "Endpoint URL da WebSocket API"
+  value       = var.enable_websocket ? aws_apigatewayv2_api.websocket_api[0].api_endpoint : null
+}
+
+output "websocket_stage_url" {
+  description = "URL do stage WebSocket"
+  value       = var.enable_websocket ? "${replace(aws_apigatewayv2_api.websocket_api[0].api_endpoint, "https://", "wss://")}/${aws_apigatewayv2_stage.websocket_stage[0].name}" : null
+}
+
+output "websocket_execution_arn" {
+  description = "Execution ARN da WebSocket API"
+  value       = var.enable_websocket ? aws_apigatewayv2_api.websocket_api[0].execution_arn : null
+}

@@ -1,0 +1,40 @@
+{
+	"id": "aws-serverless-logistics-env",
+	"name": "AWS Serverless Logistics",
+	"values": [
+		{
+			"key": "baseUrl",
+			"value": "https://tntpd380l5.execute-api.us-east-1.amazonaws.com/prod/api",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "userId",
+			"value": "8516440892",
+			"type": "default",
+			"enabled": true,
+			"description": "ID do usuário logado (exemplo)"
+		},
+		{
+			"key": "pedidoId",
+			"value": "8860534895",
+			"type": "default",
+			"enabled": true,
+			"description": "ID de exemplo de um pedido"
+		},
+		{
+			"key": "motoristaId",
+			"value": "1234567890",
+			"type": "default",
+			"enabled": true,
+			"description": "ID de exemplo de um motorista"
+		}
+	],
+	"_postman_variable_scope": "environment"
+}

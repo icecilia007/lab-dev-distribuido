@@ -90,6 +90,15 @@ module "pedido_ofertas_table" {
   tags         = local.common_tags
 }
 
+# Módulo específico para tabelas de notificações
+module "notifications_dynamodb" {
+  source = "./aws/notifications-dynamodb"
+  
+  TagEnv     = var.environment
+  TagProject = var.project_name
+  tags       = local.common_tags
+}
+
 # SQS Queue for Events
 module "events_queue" {
   source = "./aws/sqs"
@@ -103,32 +112,20 @@ module "events_queue" {
 # SNS Topics for Segmented Notifications (Pub/Sub Topics from diagram)
 module "notifications_general_topic" {
   source = "./aws/sns"
-  
-  TagEnv     = var.environment
-  TagProject = var.project_name
-  Name       = "notifications-general"
-  emails_sns = ["admin@logistics.com"]
   tags       = local.common_tags
+  prefix     = "general"
 }
 
 module "notifications_premium_topic" {
   source = "./aws/sns"
-  
-  TagEnv     = var.environment
-  TagProject = var.project_name
-  Name       = "notifications-premium"
-  emails_sns = ["admin@logistics.com"]
   tags       = local.common_tags
+  prefix     = "premium"
 }
 
 module "notifications_regional_topic" {
   source = "./aws/sns"
-  
-  TagEnv     = var.environment
-  TagProject = var.project_name
-  Name       = "notifications-regional"
-  emails_sns = ["admin@logistics.com"]
   tags       = local.common_tags
+  prefix     = "regional"
 }
 
 # Lambda Functions
@@ -229,9 +226,9 @@ module "notificacoes_lambda" {
     NOTIFICATIONS_TABLE      = module.notifications_table.name
     USERS_TABLE             = module.users_table.name
     SQS_QUEUE_URL          = module.events_queue.url
-    SNS_GENERAL_TOPIC_ARN  = module.notifications_general_topic.arn
-    SNS_PREMIUM_TOPIC_ARN  = module.notifications_premium_topic.arn
-    SNS_REGIONAL_TOPIC_ARN = module.notifications_regional_topic.arn
+    SNS_GENERAL_TOPIC_ARN  = module.notifications_general_topic.sns_topic_arn
+    SNS_PREMIUM_TOPIC_ARN  = module.notifications_premium_topic.sns_topic_arn
+    SNS_REGIONAL_TOPIC_ARN = module.notifications_regional_topic.sns_topic_arn
     WEBSOCKET_LAMBDA_NAME  = module.websocket_lambda.name
     CONNECTIONS_TABLE      = module.websocket_connections_table.name
     JWT_SECRET  = var.jwt_secret
@@ -242,6 +239,38 @@ module "notificacoes_lambda" {
     "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
     "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
     "arn:aws:iam::aws:policy/AmazonSESFullAccess",
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+  ]
+  
+  tags = local.common_tags
+}
+
+module "notificacoes_consumer_lambda" {
+  source = "./aws/lambda_image"
+  
+  TagEnv         = var.environment
+  TagProject     = var.project_name
+  lambda_name    = "notificacoes-consumer"
+  folder         = "aws-serverless-logistics/functions/notificacoes-consumer"
+  files          = ["Dockerfile", "lambda_function.py", "requirements.txt"]
+  aws_region     = var.aws_region
+  tag_image      = "latest"
+  memory         = 512
+  timeout        = 60
+  description    = "Notifications Consumer Lambda function - processes SNS messages"
+  
+  environment_variables = {
+    NOTIFICATIONS_TABLE      = module.notifications_dynamodb.notificacoes_table_name
+    PREFERENCIAS_TABLE      = module.notifications_dynamodb.preferencias_table_name
+    USERS_TABLE             = module.users_table.name
+    WEBSOCKET_LAMBDA_NAME   = module.websocket_lambda.name
+    CONNECTIONS_TABLE       = module.websocket_connections_table.name
+    JWT_SECRET              = var.jwt_secret
+  }
+  
+  additional_policies = [
+    "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+    "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
     "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
   ]
   
@@ -324,11 +353,15 @@ module "smart_routing_lambda" {
     OFERTAS_TABLE           = module.pedido_ofertas_table.name
     SQS_QUEUE_URL           = module.events_queue.url
     NOTIFICACOES_LAMBDA_NAME = module.notificacoes_lambda.name
+    WEBSOCKET_LAMBDA_NAME   = module.websocket_lambda.name
+    SNS_GENERAL_TOPIC_ARN   = module.notifications_general_topic.sns_topic_arn
+    JWT_SECRET              = var.jwt_secret
   }
   
   additional_policies = [
     "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
     "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+    "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
     "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
   ]
   
@@ -351,6 +384,15 @@ resource "aws_lambda_event_source_mapping" "smart_routing_sqs_trigger" {
   batch_size       = 5
   
   depends_on = [module.smart_routing_lambda]
+}
+
+# SQS Event Source Mapping for Notifications Consumer Lambda
+resource "aws_lambda_event_source_mapping" "notificacoes_consumer_sqs_trigger" {
+  event_source_arn = module.notifications_general_topic.sqs_notificacoes_arn
+  function_name    = module.notificacoes_consumer_lambda.name
+  batch_size       = 10
+  
+  depends_on = [module.notificacoes_consumer_lambda]
 }
 
 # API Gateway
@@ -439,7 +481,7 @@ module "api_gateway" {
           request_parameters = {}
         },
         {
-          path               = "pedidos/motorista/{motoristaId}"
+          path               = "pedidos/motorista"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -451,7 +493,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.motoristaId" = true
+            "method.request.querystring.motoristaId" = true
           }
         },
         {
@@ -488,7 +530,7 @@ module "api_gateway" {
           }
         },
         {
-          path               = "pedidos/acoes/cancelar/{pedidoId}"
+          path               = "pedidos/acoes/cancelar"
           method             = "PATCH"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -500,7 +542,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.pedidoId" = true
+            "method.request.querystring.pedidoId" = true
           }
         },
         {
@@ -570,7 +612,7 @@ module "api_gateway" {
           }
         },
         {
-          path               = "notificacoes/{notificacaoId}/marcar-lida"
+          path               = "notificacoes/marcar-lida"
           method             = "PATCH"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -582,11 +624,11 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.notificacaoId" = true
+            "method.request.querystring.notificacaoId" = true
           }
         },
         {
-          path               = "notificacoes/preferencias-usuario/{usuarioId}"
+          path               = "notificacoes/preferencias-usuario"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -598,12 +640,12 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.usuarioId" = true
+            "method.request.querystring.usuarioId" = true
           }
         },
         # Rastreamento routes
         {
-          path               = "rastreamento/pedido/{pedidoId}"
+          path               = "rastreamento/pedido"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -615,11 +657,11 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.pedidoId" = true
+            "method.request.querystring.pedidoId" = true
           }
         },
         {
-          path               = "rastreamento/historico-pedido/{pedidoId}"
+          path               = "rastreamento/historico-pedido"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -631,7 +673,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.pedidoId" = true
+            "method.request.querystring.pedidoId" = true
           }
         },
         {
@@ -649,7 +691,7 @@ module "api_gateway" {
           request_parameters = {}
         },
         {
-          path               = "rastreamento/acao-coleta/{pedidoId}"
+          path               = "rastreamento/acao-coleta"
           method             = "POST"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -661,12 +703,12 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.pedidoId" = true
+            "method.request.querystring.pedidoId" = true
             "method.request.querystring.motoristaId" = true
           }
         },
         {
-          path               = "rastreamento/motorista/estatistica/{driverId}"
+          path               = "rastreamento/motorista/estatistica"
           method             = "GET"
           auth_type          = "NONE"
           integration_type   = "AWS_PROXY"
@@ -678,7 +720,7 @@ module "api_gateway" {
           api_key_required   = false
           authorization      = "NONE"
           request_parameters = {
-            "method.request.path.driverId" = true
+            "method.request.querystring.driverId" = true
             "method.request.querystring.dataInicio" = true
             "method.request.querystring.dataFim" = true
           }
@@ -875,8 +917,8 @@ output "lambda_functions" {
 output "sns_topics" {
   description = "SNS Topic ARNs"
   value = {
-    general  = module.notifications_general_topic.arn
-    premium  = module.notifications_premium_topic.arn
-    regional = module.notifications_regional_topic.arn
+    general  = module.notifications_general_topic.sns_topic_arn
+    premium  = module.notifications_premium_topic.sns_topic_arn
+    regional = module.notifications_regional_topic.sns_topic_arn
   }
 }

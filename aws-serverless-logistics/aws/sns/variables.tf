@@ -1,24 +1,19 @@
 # -*- coding: utf-8 -*-
-# File name infra/modules/sns/variables.tf
+# Variables para SNS/SQS Event System (compatível com RabbitMQ Java)
 
-variable "TagProject" {
-  type = string
-}
-
-variable "TagEnv" {
-  type = string
+variable "prefix" {
+  description = "Prefixo para recursos AWS"
+  type        = string
 }
 
 variable "tags" {
-  type = map(string)
+  description = "Tags padrão para recursos"
+  type        = map(string)
+  default     = {}
 }
 
-variable "Name" {
-  type = string
-}
-
-
-variable "emails_sns" {
-  description = "Lista de e-mails para receber notificações do SNS"
-  type        = list(string)
+variable "environment" {
+  description = "Ambiente (dev, prod, etc.)"
+  type        = string
+  default     = "dev"
 }
