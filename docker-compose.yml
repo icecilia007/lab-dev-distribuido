@@ -163,49 +163,6 @@ services:
       - logistica-network
     restart: unless-stopped
 
-  lambda-simulator:
-    build: ./lambda
-    container_name: lambda-simulator
-    ports:
-      - "9000:8080"
-    environment:
-      - NOTIFICACOES_URL=http://notificacao-service:8083
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=main_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-      notificacao-service:
-        condition: service_started
-    networks:
-      - logistica-network
-    restart: unless-stopped
-    profiles:
-      - lambda
-
-  lambda-webhook:
-    build:
-      context: ./lambda
-      dockerfile: Dockerfile.webhook
-    container_name: lambda-webhook
-    environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - LAMBDA_URL=http://lambda-simulator:8080/2015-03-31/functions/function/invocations
-      - QUEUE_NAME=lambda.webhook
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      lambda-simulator:
-        condition: service_started
-    networks:
-      - logistica-network
-    restart: unless-stopped
-    profiles:
-      - lambda
-
 volumes:
   postgres-data:
   rabbitmq_data:
