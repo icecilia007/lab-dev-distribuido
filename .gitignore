@@ -77,3 +77,6 @@ app.*.map.json
 /android/app/release
 
 poetry.lock
+*.terraform
+.terraform/
+**/.terraform/*
