@@ -224,11 +224,9 @@ public class CampanhaServiceImpl implements CampanhaService {
 
     private ResponseEntity<String> chamarLambdaAWS(TriggerRequest triggerRequest) {
         try {
-            log.debug("Preparando headers para requisição Lambda");
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("User-Agent", "Sistema-Logistica-Campanhas/1.0");
 
             HttpEntity<TriggerRequest> entity = new HttpEntity<>(triggerRequest, headers);
 
@@ -243,14 +241,7 @@ public class CampanhaServiceImpl implements CampanhaService {
             log.info("Resposta recebida da AWS Lambda - Status: {}", response.getStatusCode());
             log.debug("Corpo da resposta Lambda: {}", response.getBody());
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("=== CAMPANHA '{}' ENVIADA COM SUCESSO PARA LAMBDA ===", triggerRequest.getNome());
-            } else {
-                log.warn("Lambda retornou status não-sucesso: {}", response.getStatusCode());
-            }
-
             return response;
-
         } catch (RestClientException e) {
             log.error("Erro REST ao chamar Lambda: {}", e.getMessage(), e);
             throw e;
