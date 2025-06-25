@@ -52,7 +52,8 @@ public class UsuarioServiceImpl implements UsuarioService {
                 usuario.getNome(),
                 usuario.getEmail(),
                 tipo,
-                usuario.getTelefone()
+                usuario.getTelefone(),
+                usuario.getRegiao()
         );
     }
 
