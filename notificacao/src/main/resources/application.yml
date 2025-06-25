@@ -4,7 +4,7 @@ server:
   # OU address: 192.168.1.100  # Aceita apenas conexões do endereço IP específico da rede interna
 services:
   usuario:
-    url: http://localhost:8080/api/usuarios
+    url: "${USUARIO_SERVICE_URL:http://localhost:8080}"
 security:
   internal:
     header-name: X-Internal-Auth

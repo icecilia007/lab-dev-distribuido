@@ -36,7 +36,7 @@ public class UsuarioServiceClient {
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         return restTemplate.exchange(
-                usuarioServiceUrl + "/clientes",
+                usuarioServiceUrl + "/api/usuarios/clientes",
                 HttpMethod.GET,
                 entity,
                 new ParameterizedTypeReference<List<ClienteResponse>>() {}

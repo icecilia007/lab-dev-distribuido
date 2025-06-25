@@ -1,5 +1,6 @@
 package com.logistica.notificacao.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.logistica.notificacao.dto.*;
 import com.logistica.notificacao.exception.ServicoExternoException;
 import com.logistica.notificacao.exception.ValidacaoException;
@@ -26,6 +27,7 @@ public class CampanhaServiceImpl implements CampanhaService {
 
     private final RestTemplate restTemplate;
     private final UsuarioServiceClient usuarioServiceClient;
+    private final ObjectMapper objectMapper;
 
     @Value("${aws.trigger.url}")
     private String lambdaUrl;
@@ -34,6 +36,7 @@ public class CampanhaServiceImpl implements CampanhaService {
     public CampanhaServiceImpl(UsuarioServiceClient usuarioServiceClient, NotificacaoService notificacaoService) {
         this.notificacaoService = notificacaoService;
         this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
         this.usuarioServiceClient = usuarioServiceClient;
     }
 
@@ -54,6 +57,15 @@ public class CampanhaServiceImpl implements CampanhaService {
             log.info("Total de grupos criados: {}", grupos.size());
 
             TriggerRequest triggerRequest = montarTriggerRequest(campanhaBasica, grupos);
+
+            try {
+                String jsonCompleto = objectMapper.writeValueAsString(triggerRequest);
+                log.info("=== JSON QUE SERÁ ENVIADO PARA LAMBDA ===");
+                log.info(jsonCompleto);
+                log.info("=== FIM DO JSON ===");
+            } catch (Exception e) {
+                log.warn("Erro ao serializar TriggerRequest para JSON: {}", e.getMessage());
+            }
 
             logDetalhesGrupos(grupos);
 
@@ -132,7 +144,7 @@ public class CampanhaServiceImpl implements CampanhaService {
                 .collect(Collectors.toList());
 
         if (!clientesOutrosSul.isEmpty()) {
-            grupos.add(new GrupoRequest("outros_sul", clientesOutrosSul));
+            grupos.add(new GrupoRequest("regiao_sul", clientesOutrosSul));
             log.info("Grupo 'outros_sul' criado com {} clientes da região sul", clientesOutrosSul.size());
         }
 
@@ -143,7 +155,7 @@ public class CampanhaServiceImpl implements CampanhaService {
                 .collect(Collectors.toList());
 
         if (!clientesOutrosOutrasRegioes.isEmpty()) {
-            grupos.add(new GrupoRequest("outros_demais_regioes", clientesOutrosOutrasRegioes));
+            grupos.add(new GrupoRequest("outros", clientesOutrosOutrasRegioes));
             log.info("Grupo 'outros_demais_regioes' criado com {} clientes de regiões exceto sul", clientesOutrosOutrasRegioes.size());
         }
 

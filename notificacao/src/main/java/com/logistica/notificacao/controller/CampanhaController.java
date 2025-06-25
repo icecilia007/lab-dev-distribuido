@@ -23,7 +23,7 @@ public class CampanhaController {
     @PostMapping("/trigger")
     public ResponseEntity<String> enviarCampanha(@Valid @RequestBody CampanhaBasicaRequest campanhaBasica) {
         ResponseEntity<String> response = campanhaService.enviarCampanha(campanhaBasica);
-        return ResponseEntity.ok("Campanha enviada com sucesso para AWS Lambda! Resposta: " + response.getBody());
+        return ResponseEntity.ok(response.getBody());
 
     }
 
