@@ -1,21 +1,28 @@
 package com.logistica.notificacao.service.impl;
 
 import com.logistica.notificacao.dto.*;
+import com.logistica.notificacao.exception.ServicoExternoException;
+import com.logistica.notificacao.exception.ValidacaoException;
+import com.logistica.notificacao.exception.RecursoNaoEncontradoException;
+import com.logistica.notificacao.model.Notificacao;
 import com.logistica.notificacao.service.CampanhaService;
+import com.logistica.notificacao.service.NotificacaoService;
 import com.logistica.notificacao.service.UsuarioServiceClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class CampanhaServiceImpl implements CampanhaService {
-
 
     private final RestTemplate restTemplate;
     private final UsuarioServiceClient usuarioServiceClient;
@@ -23,66 +30,152 @@ public class CampanhaServiceImpl implements CampanhaService {
     @Value("${aws.trigger.url}")
     private String lambdaUrl;
 
-    public CampanhaServiceImpl(UsuarioServiceClient usuarioServiceClient) {
+    private final NotificacaoService notificacaoService;
+    public CampanhaServiceImpl(UsuarioServiceClient usuarioServiceClient, NotificacaoService notificacaoService) {
+        this.notificacaoService = notificacaoService;
         this.restTemplate = new RestTemplate();
         this.usuarioServiceClient = usuarioServiceClient;
     }
 
+    @Override
     public ResponseEntity<String> enviarCampanha(CampanhaBasicaRequest campanhaBasica) {
-
-        System.out.println("Iniciando processamento da campanha: " + campanhaBasica.getNome());
-
         try {
+            validarCampanhaBasica(campanhaBasica);
+
             List<ClienteResponse> clientes = usuarioServiceClient.buscarTodosClientes();
-            System.out.println("Total de clientes encontrados: " + clientes.size());
+            log.info("Total de clientes encontrados: {}", clientes.size());
+
+            if (clientes.isEmpty()) {
+                log.warn("Nenhum cliente encontrado para envio da campanha: {}", campanhaBasica.getNome());
+                throw new RecursoNaoEncontradoException("Nenhum cliente cadastrado encontrado para envio da campanha");
+            }
 
             List<GrupoRequest> grupos = agruparClientesPorCategoria(clientes);
-            System.out.println("Total de grupos criados: " + grupos.size());
+            log.info("Total de grupos criados: {}", grupos.size());
 
-            TriggerRequest triggerRequest = new TriggerRequest();
-            triggerRequest.setNome(campanhaBasica.getNome());
-            triggerRequest.setAssunto(campanhaBasica.getAssunto());
-            triggerRequest.setConteudo(campanhaBasica.getConteudo());
-            triggerRequest.setGrupos(grupos);
+            TriggerRequest triggerRequest = montarTriggerRequest(campanhaBasica, grupos);
 
-            System.out.println("Payload completo montado para envio à AWS Lambda");
-            grupos.forEach(grupo ->
-                    System.out.println("Grupo '" + grupo.getTipo() + "' com " + grupo.getClientes().size() + " clientes")
-            );
+            logDetalhesGrupos(grupos);
 
-            return chamarLambdaAWS(triggerRequest);
+            ResponseEntity<String> lambdaResponse = chamarLambdaAWS(triggerRequest);
+
+            if (lambdaResponse.getStatusCode().is2xxSuccessful()) {
+                criarNotificacoesParaClientes(campanhaBasica, grupos);
+            }
+
+            return lambdaResponse;
+
+        } catch (ValidacaoException | RecursoNaoEncontradoException e) {
+            log.error("Erro de validação/recurso na campanha '{}': {}", campanhaBasica.getNome(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Erro de validação: " + e.getMessage());
+
+        } catch (ServicoExternoException e) {
+            log.error("Erro em serviço externo durante campanha '{}': {}", campanhaBasica.getNome(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Serviço temporariamente indisponível: " + e.getMessage());
 
         } catch (Exception e) {
-            System.err.println("Erro geral no processamento da campanha: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Erro inesperado no processamento da campanha '{}': {}", campanhaBasica.getNome(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao processar campanha: " + e.getMessage());
+                    .body("Erro interno do servidor: " + e.getMessage());
         }
+    }
+
+    private void validarCampanhaBasica(CampanhaBasicaRequest campanhaBasica) {
+        Map<String, String> erros = new HashMap<>();
+
+        if (campanhaBasica.getNome() == null || campanhaBasica.getNome().trim().isEmpty()) {
+            erros.put("nome", "Nome da campanha é obrigatório");
+        }
+        if (campanhaBasica.getAssunto() == null || campanhaBasica.getAssunto().trim().isEmpty()) {
+            erros.put("assunto", "Assunto da campanha é obrigatório");
+        }
+        if (campanhaBasica.getConteudo() == null || campanhaBasica.getConteudo().trim().isEmpty()) {
+            erros.put("conteudo", "Conteúdo da campanha é obrigatório");
+        }
+
+        if (!erros.isEmpty()) {
+            log.warn("Validação falhou para campanha com erros: {}", erros);
+            throw new ValidacaoException("Dados da campanha inválidos", erros);
+        }
+
+        log.debug("Validação da campanha '{}' concluída com sucesso", campanhaBasica.getNome());
     }
 
     private List<GrupoRequest> agruparClientesPorCategoria(List<ClienteResponse> clientes) {
         List<ClienteResponse> clientesValidos = clientes.stream()
-                .filter(cliente -> cliente.getRegiao() != null && !cliente.getRegiao().trim().isEmpty())
+                .filter(this::isClienteValido)
                 .collect(Collectors.toList());
 
-        System.out.println("Clientes com região válida: " + clientesValidos.size());
+
+        if (clientesValidos.isEmpty()) {
+            log.warn("Nenhum cliente válido encontrado após aplicar filtros");
+            return new ArrayList<>();
+        }
 
         Map<String, List<ClienteRequest>> clientesPorCategoria = clientesValidos.stream()
                 .collect(Collectors.groupingBy(
-                        cliente -> {
-                            String categoria = cliente.getCategoria();
-                            return (categoria != null && !categoria.trim().isEmpty()) ? categoria : "outros";
-                        },
+                        this::determinarCategoria,
                         Collectors.mapping(this::converterParaClienteRequest, Collectors.toList())
                 ));
 
-        clientesPorCategoria.forEach((categoria, listaClientes) ->
-                System.out.println("Categoria '" + categoria + "': " + listaClientes.size() + " clientes")
-        );
 
-        return clientesPorCategoria.entrySet().stream()
+        List<GrupoRequest> grupos = clientesPorCategoria.entrySet().stream()
                 .map(entry -> new GrupoRequest(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
+
+        return grupos;
+    }
+
+    private boolean isClienteValido(ClienteResponse cliente) {
+        if (cliente == null) {
+            log.debug("Cliente null encontrado - será filtrado");
+            return false;
+        }
+
+        if (cliente.getId() == null) {
+            log.debug("Cliente com ID null encontrado - será filtrado");
+            return false;
+        }
+
+        if (cliente.getEmail() == null || cliente.getEmail().trim().isEmpty()) {
+            log.debug("Cliente ID {} sem email válido - será filtrado", cliente.getId());
+            return false;
+        }
+
+        if (cliente.getRegiao() == null || cliente.getRegiao().trim().isEmpty()) {
+            log.debug("Cliente ID {} sem região válida - será filtrado", cliente.getId());
+            return false;
+        }
+
+        return true;
+    }
+
+    private String determinarCategoria(ClienteResponse cliente) {
+        String categoria = cliente.getCategoria();
+        return (categoria != null && !categoria.trim().isEmpty()) ? categoria : "outros";
+    }
+
+    private TriggerRequest montarTriggerRequest(CampanhaBasicaRequest campanhaBasica, List<GrupoRequest> grupos) {
+        TriggerRequest triggerRequest = new TriggerRequest();
+        triggerRequest.setNome(campanhaBasica.getNome());
+        triggerRequest.setAssunto(campanhaBasica.getAssunto());
+        triggerRequest.setConteudo(campanhaBasica.getConteudo());
+        triggerRequest.setGrupos(grupos);
+
+        return triggerRequest;
+    }
+
+    private void logDetalhesGrupos(List<GrupoRequest> grupos) {
+        log.info("=== DETALHES DOS GRUPOS DA CAMPANHA ===");
+        grupos.forEach(grupo -> {
+            log.info("Grupo '{}' - {} clientes:", grupo.getTipo(), grupo.getClientes().size());
+            grupo.getClientes().forEach(cliente ->
+                    log.debug("  - Cliente {}: {} ({})", cliente.getId(), cliente.getNome(), cliente.getRegiao())
+            );
+        });
+        log.info("=== FIM DOS DETALHES DOS GRUPOS ===");
     }
 
     private ClienteRequest converterParaClienteRequest(ClienteResponse cliente) {
@@ -96,7 +189,7 @@ public class CampanhaServiceImpl implements CampanhaService {
 
     private ResponseEntity<String> chamarLambdaAWS(TriggerRequest triggerRequest) {
         try {
-            System.out.println("Enviando campanha para AWS Lambda: " + lambdaUrl);
+            log.debug("Preparando headers para requisição Lambda");
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -104,6 +197,7 @@ public class CampanhaServiceImpl implements CampanhaService {
 
             HttpEntity<TriggerRequest> entity = new HttpEntity<>(triggerRequest, headers);
 
+            log.info("Enviando requisição para Lambda: {}", lambdaUrl);
             ResponseEntity<String> response = restTemplate.exchange(
                     lambdaUrl,
                     HttpMethod.POST,
@@ -111,20 +205,55 @@ public class CampanhaServiceImpl implements CampanhaService {
                     String.class
             );
 
-            System.out.println("Resposta da AWS Lambda - Status: " + response.getStatusCode());
-            System.out.println("Resposta da AWS Lambda - Body: " + response.getBody());
+            log.info("Resposta recebida da AWS Lambda - Status: {}", response.getStatusCode());
+            log.debug("Corpo da resposta Lambda: {}", response.getBody());
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("=== CAMPANHA '{}' ENVIADA COM SUCESSO PARA LAMBDA ===", triggerRequest.getNome());
+            } else {
+                log.warn("Lambda retornou status não-sucesso: {}", response.getStatusCode());
+            }
 
             return response;
 
         } catch (RestClientException e) {
-            System.err.println("Erro de comunicação com AWS Lambda: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body("Erro ao comunicar com AWS Lambda: " + e.getMessage());
+            log.error("Erro REST ao chamar Lambda: {}", e.getMessage(), e);
+            throw e;
         } catch (Exception e) {
-            System.err.println("Erro inesperado ao chamar AWS Lambda: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro interno ao enviar campanha: " + e.getMessage());
+            log.error("Erro inesperado ao chamar Lambda: {}", e.getMessage(), e);
+            throw new ServicoExternoException("Erro inesperado na comunicação com Lambda", e);
         }
+    }
+
+    private void criarNotificacoesParaClientes(CampanhaBasicaRequest campanhaBasica, List<GrupoRequest> grupos) {
+        log.info("Criando notificações para clientes da campanha: {}", campanhaBasica.getNome());
+
+        for (GrupoRequest grupo : grupos) {
+            for (ClienteRequest cliente : grupo.getClientes()) {
+                try {
+                    Notificacao notificacao = new Notificacao();
+                    notificacao.setTipoEvento("CAMPANHA_MARKETING");
+                    notificacao.setOrigem("CAMPANHAS_SERVICE");
+                    notificacao.setDestinatarioId(Long.valueOf(cliente.getId()));
+                    notificacao.setTitulo(campanhaBasica.getAssunto());
+                    notificacao.setMensagem(campanhaBasica.getConteudo());
+                    notificacao.setDataCriacao(LocalDateTime.now());
+                    notificacao.setStatus(Notificacao.StatusNotificacao.NAO_LIDA);
+
+                    Map<String, Object> dadosEvento = new HashMap<>();
+                    dadosEvento.put("nome", campanhaBasica.getNome());
+                    dadosEvento.put("assunto", campanhaBasica.getAssunto());
+                    dadosEvento.put("conteudo", campanhaBasica.getConteudo());
+                    notificacao.setDadosEvento(dadosEvento);
+
+                    notificacaoService.salvar(notificacao);
+
+                } catch (Exception e) {
+                    log.warn("Erro ao criar notificação para cliente {}: {}", cliente.getId(), e.getMessage());
+                }
+            }
+        }
+
+        log.info("Notificações criadas com sucesso para campanha: {}", campanhaBasica.getNome());
     }
 }
