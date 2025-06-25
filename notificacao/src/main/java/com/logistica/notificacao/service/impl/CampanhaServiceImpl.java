@@ -106,27 +106,50 @@ public class CampanhaServiceImpl implements CampanhaService {
     private List<GrupoRequest> agruparClientesPorCategoria(List<ClienteResponse> clientes) {
         List<ClienteResponse> clientesValidos = clientes.stream()
                 .filter(this::isClienteValido)
-                .collect(Collectors.toList());
-
+                .toList();
 
         if (clientesValidos.isEmpty()) {
             log.warn("Nenhum cliente válido encontrado após aplicar filtros");
             return new ArrayList<>();
         }
 
-        Map<String, List<ClienteRequest>> clientesPorCategoria = clientesValidos.stream()
-                .collect(Collectors.groupingBy(
-                        this::determinarCategoria,
-                        Collectors.mapping(this::converterParaClienteRequest, Collectors.toList())
-                ));
+        List<GrupoRequest> grupos = new ArrayList<>();
 
-
-        List<GrupoRequest> grupos = clientesPorCategoria.entrySet().stream()
-                .map(entry -> new GrupoRequest(entry.getKey(), entry.getValue()))
+        List<ClienteRequest> clientesPremium = clientesValidos.stream()
+                .filter(cliente -> "premium".equalsIgnoreCase(determinarCategoria(cliente)))
+                .map(this::converterParaClienteRequest)
                 .collect(Collectors.toList());
+
+        if (!clientesPremium.isEmpty()) {
+            grupos.add(new GrupoRequest("premium", clientesPremium));
+            log.info("Grupo 'premium' criado com {} clientes de todas as regiões", clientesPremium.size());
+        }
+
+        List<ClienteRequest> clientesOutrosSul = clientesValidos.stream()
+                .filter(cliente -> "outros".equalsIgnoreCase(determinarCategoria(cliente)))
+                .filter(cliente -> "sul".equalsIgnoreCase(cliente.getRegiao()))
+                .map(this::converterParaClienteRequest)
+                .collect(Collectors.toList());
+
+        if (!clientesOutrosSul.isEmpty()) {
+            grupos.add(new GrupoRequest("outros_sul", clientesOutrosSul));
+            log.info("Grupo 'outros_sul' criado com {} clientes da região sul", clientesOutrosSul.size());
+        }
+
+        List<ClienteRequest> clientesOutrosOutrasRegioes = clientesValidos.stream()
+                .filter(cliente -> "outros".equalsIgnoreCase(determinarCategoria(cliente)))
+                .filter(cliente -> !"sul".equalsIgnoreCase(cliente.getRegiao()))
+                .map(this::converterParaClienteRequest)
+                .collect(Collectors.toList());
+
+        if (!clientesOutrosOutrasRegioes.isEmpty()) {
+            grupos.add(new GrupoRequest("outros_demais_regioes", clientesOutrosOutrasRegioes));
+            log.info("Grupo 'outros_demais_regioes' criado com {} clientes de regiões exceto sul", clientesOutrosOutrasRegioes.size());
+        }
 
         return grupos;
     }
+
 
     private boolean isClienteValido(ClienteResponse cliente) {
         if (cliente == null) {
