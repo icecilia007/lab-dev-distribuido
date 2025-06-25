@@ -21,6 +21,7 @@ class AuthService {
       await prefs.setString('userName', user.name);
       await prefs.setString('userEmail', user.email);
       await prefs.setString('userType', user.type);
+      await prefs.setString('userRegiao', user.regiao);
       if (user.phone != null) {
         await prefs.setString('userPhone', user.phone!);
       }
@@ -44,6 +45,7 @@ class AuthService {
     await prefs.remove('userName');
     await prefs.remove('userEmail');
     await prefs.remove('userType');
+    await prefs.remove('userRegiao');
     await prefs.remove('userPhone');
     await prefs.remove('authToken');
 
@@ -51,7 +53,7 @@ class AuthService {
     print("Token após logout: ${_apiService.authToken}");
   }
 
-  Future<Map<String, dynamic>> \autoLogin() async {
+  Future<Map<String, dynamic>> autoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
     final authToken = prefs.getString('authToken');
@@ -65,6 +67,7 @@ class AuthService {
       id: userId,
       name: prefs.getString('userName') ?? '',
       email: prefs.getString('userEmail') ?? '',
+      regiao: prefs.getString('userRegiao') ?? '',
       type: userType ?? '',
       phone: prefs.getString('userPhone'),
     );

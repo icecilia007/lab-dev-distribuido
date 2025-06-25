@@ -12,7 +12,7 @@ class LocationUpdateService {
   Position? _lastPosition;
   final int _driverId;
   int? _currentOrderId;
-  static const int _updateIntervalMinutes = 2;
+  static const int _updateIntervalMinutes = 30;
 
   LocationUpdateService({
     required ApiService apiService,

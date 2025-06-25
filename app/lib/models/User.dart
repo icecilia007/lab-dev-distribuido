@@ -4,11 +4,13 @@ class User {
   final String email;
   final String type;
   final String? phone;
+  final String regiao;
 
   User({
     required this.id,
     required this.name,
     required this.email,
+    required this.regiao,
     required this.type,
     this.phone,
   });
@@ -20,6 +22,7 @@ class User {
       email: json['email'],
       type: json['tipo'],
       phone: json['telefone'],
+      regiao: json['regiao'],
     );
   }
 }

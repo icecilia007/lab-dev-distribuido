@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/pedido.dart';
-import '../services/api_service.dart';
-import '../services/auth_service.dart';
-import '../services/notification_manager.dart';
+import '../../models/pedido.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../manager/notification_manager.dart';
 import 'new_order_screen.dart';
-import 'notifications_screen.dart';
-import 'order_tracking_screen.dart';
+import '../notifications_screen.dart';
+import '../order_tracking_screen.dart';
 import 'order_history_screen.dart';
-import 'settings_screen.dart';
+import '../settings_screen.dart';
 import 'package:badges/badges.dart' as badges;
 
 

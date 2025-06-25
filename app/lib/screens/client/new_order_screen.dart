@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import '../services/api_service.dart';
-import '../services/auth_service.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 
 class NewOrderScreen extends StatefulWidget {
   final ApiService apiService;
@@ -22,14 +22,20 @@ class NewOrderScreen extends StatefulWidget {
 class _NewOrderScreenState extends State<NewOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mercadoriaController = TextEditingController();
+  final _cupomController = TextEditingController();
 
   LatLng _origem = const LatLng(0, 0);
   LatLng _destino = const LatLng(0, 0);
-
   bool _isLoading = false;
   bool _origemSelecionada = false;
   bool _destinoSelecionado = false;
   bool _useCurrentLocationAsOrigin = false;
+  bool _cupomValidado = false;
+  bool _validandoCupom = false;
+
+  double _descontoCupom = 0.0;
+  String _mensagemCupom = '';
+  String _codigoCupomValidado = '';
 
   final MapController _mapController = MapController();
   List<Marker> _markers = [];
@@ -43,6 +49,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   void dispose() {
     _mercadoriaController.dispose();
+    _cupomController.dispose();
     super.dispose();
   }
 
@@ -52,7 +59,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Serviços de localização desabilitados. Por favor, habilite-os.'),
@@ -67,7 +74,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Permissão de localização negada'),
@@ -80,7 +87,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Permissão de localização permanentemente negada. Abra as configurações para alterar.'),
@@ -91,7 +98,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       return;
     }
 
-    // Se chegou aqui, temos permissão
     _getCurrentLocation();
   }
 
@@ -101,6 +107,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           desiredAccuracy: LocationAccuracy.high
       );
 
+      if (!mounted) return;
+
       setState(() {
         if (_useCurrentLocationAsOrigin) {
           _origem = LatLng(position.latitude, position.longitude);
@@ -109,13 +117,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         }
       });
 
-      // Centralizar mapa na posição atual
       _mapController.move(
           LatLng(position.latitude, position.longitude),
           15
       );
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao obter localização: $e'),
@@ -185,11 +192,99 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
+  Future<void> _validarCupom() async {
+    if (_cupomController.text.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _mensagemCupom = 'Digite um código de cupom';
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _validandoCupom = true;
+        _mensagemCupom = '';
+      });
+    }
+
+    try {
+      final resultado = await widget.apiService.validarCupom(_cupomController.text.trim());
+
+      if (!mounted) return;
+
+      if (resultado != null) {
+        if (resultado.containsKey('error')) {
+          setState(() {
+            _cupomValidado = false;
+            _descontoCupom = 0.0;
+            _codigoCupomValidado = '';
+            _mensagemCupom = resultado['error'];
+          });
+        } else {
+          final desconto = resultado['desconto'] as double;
+          final status = resultado['status'] as String;
+          final usosRestantes = resultado['usos_restantes'] as int;
+
+          // MODIFICAÇÃO: Adicionar verificação para desconto == 0.0
+          if (status == 'indisponivel' || usosRestantes == 0 || desconto == 0.0) {
+            setState(() {
+              _cupomValidado = false;
+              _descontoCupom = 0.0;
+              _codigoCupomValidado = '';
+              _mensagemCupom = 'Cupom indisponível';
+            });
+          } else {
+            final percentualDesconto = (desconto * 100).toInt();
+            setState(() {
+              _cupomValidado = true;
+              _descontoCupom = desconto;
+              _codigoCupomValidado = _cupomController.text.trim();
+              _mensagemCupom = 'Você ganhou cupom de $percentualDesconto%';
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cupomValidado = false;
+          _descontoCupom = 0.0;
+          _codigoCupomValidado = '';
+          _mensagemCupom = 'Erro ao validar cupom';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _validandoCupom = false;
+        });
+      }
+    }
+  }
+
+
+  void _limparCupom() {
+    setState(() {
+      _cupomController.clear();
+      _cupomValidado = false;
+      _descontoCupom = 0.0;
+      _codigoCupomValidado = '';
+      _mensagemCupom = '';
+    });
+  }
+
   void _resetForm() {
     setState(() {
       _origemSelecionada = false;
       _destinoSelecionado = false;
       _mercadoriaController.clear();
+      _cupomController.clear();
+      _cupomValidado = false;
+      _descontoCupom = 0.0;
+      _codigoCupomValidado = '';
+      _mensagemCupom = '';
       _markers = [];
       _useCurrentLocationAsOrigin = false;
     });
@@ -201,18 +296,22 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     }
 
     if (!_origemSelecionada || !_destinoSelecionado) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione os pontos de origem e destino no mapa'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selecione os pontos de origem e destino no mapa'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       await widget.apiService.criarPedido(
@@ -224,17 +323,23 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         widget.authService.currentUser!.id,
       );
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido criado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context, true); // Retorna true para indicar sucesso
+      if (!mounted) return;
+
+      String mensagemSucesso = 'Pedido criado com sucesso!';
+      if (_cupomValidado) {
+        final percentualDesconto = (_descontoCupom * 100).toInt();
+        mensagemSucesso += ' Desconto de $percentualDesconto% será aplicado.';
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensagemSucesso),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao criar pedido: $e'),
@@ -243,9 +348,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -266,7 +373,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
-                      initialCenter: const LatLng(-23.550520, -46.633308), // São Paulo como padrão
+                      initialCenter: const LatLng(-23.550520, -46.633308),
                       initialZoom: 12,
                       onTap: _onMapTap,
                     ),
@@ -277,7 +384,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         maxZoom: 19,
                       ),
                       MarkerLayer(markers: _markers),
-                      // Adicionar botão de localização
                       RichAttributionWidget(
                         attributions: [
                           TextSourceAttribution(
@@ -348,6 +454,78 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         return null;
                       },
                     ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _cupomController,
+                            decoration: InputDecoration(
+                              labelText: 'Código do Cupom (opcional)',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.local_offer),
+                              suffixIcon: _cupomController.text.isNotEmpty
+                                  ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: _limparCupom,
+                              )
+                                  : null,
+                            ),
+                            textCapitalization: TextCapitalization.characters,
+                            onChanged: (value) {
+                              setState(() {});
+                              if (_cupomValidado && value != _codigoCupomValidado) {
+                                _limparCupom();
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _validandoCupom ? null : _validarCupom,
+                          child: _validandoCupom
+                              ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : const Text('Validar'),
+                        ),
+                      ],
+                    ),
+                    if (_mensagemCupom.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _cupomValidado ? Colors.green.shade50 : Colors.red.shade50,
+                          border: Border.all(
+                            color: _cupomValidado ? Colors.green : Colors.red,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _cupomValidado ? Icons.check_circle : Icons.error,
+                              color: _cupomValidado ? Colors.green : Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _mensagemCupom,
+                                style: TextStyle(
+                                  color: _cupomValidado ? Colors.green.shade700 : Colors.red.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     Row(
                       children: [

@@ -38,6 +38,26 @@ class ApiService {
     return headers;
   }
 
+  Future<Map<String, dynamic>?> validarCupom(String codigoCupom) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://ceqvslj8df.execute-api.us-east-1.amazonaws.com/prod/cupons/$codigoCupom'),
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorResponse = jsonDecode(response.body);
+        return errorResponse;
+      }
+    } catch (e) {
+      print('Erro ao validar cupom: $e');
+      return {'error': 'Erro de conexão'};
+    }
+  }
+
+
   Future<User> login(String email, String password) async {
     try {
       _authToken = null;
