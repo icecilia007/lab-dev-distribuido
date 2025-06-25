@@ -1,4 +1,4 @@
-{
+{"body":{
   "nome": "Black Friday 2024 - Sistema de Logística",
   "assunto": "🔥 Black Friday - Até 50% OFF em entregas!",
   "conteudo": "Não perca a maior promoção do ano! Descontos imperdíveis em todos os nossos serviços de logística. Aproveite frete grátis e entrega expressa com preços especiais. Válido apenas hoje!",
@@ -8,22 +8,57 @@
       "clientes": [
         {
           "id": "1",
-          "nome": "Ari Henrique", 
+          "nome": "Ari Henrique",
           "email": "arihenriquedev@hotmail.com",
           "regiao": "sudeste"
+        },
+        {
+          "id": "1",
+          "nome": "Ari Henrique",
+          "email": "arihenriquedev@hotmail.com",
+          "regiao": "centro-oeste"
+        },
+        {
+          "id": "1",
+          "nome": "Ari Henrique",
+          "email": "arihenriquedev@hotmail.com",
+          "regiao": "norte"
         }
       ]
     },
     {
-      "tipo": "geral",
+      "tipo": "regiao_sul",
       "clientes": [
         {
           "id": "2",
           "nome": "Estudante PUC",
-          "email": "1457902@sga.pucminas.br", 
+          "email": "1457902@sga.pucminas.br",
           "regiao": "sudeste"
+        },
+        {
+          "id": "2",
+          "nome": "Estudante PUC",
+          "email": "1457902@sga.pucminas.br",
+          "regiao": "nordeste"
+        }
+      ]
+    },
+    {
+      "tipo": "outros",
+      "clientes": [
+        {
+          "id": "2",
+          "nome": "Estudante PUC",
+          "email": "1457902@sga.pucminas.br",
+          "regiao": "sudeste"
+        },
+        {
+          "id": "2",
+          "nome": "Estudante PUC",
+          "email": "1457902@sga.pucminas.br",
+          "regiao": "nordeste"
         }
       ]
     }
   ]
-}
+}}

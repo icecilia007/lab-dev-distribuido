@@ -72,8 +72,8 @@ create_csv_template() {
 email,nome,regiao,tipo_cliente
 arihenriquedev@hotmail.com,Ari Henrique,sudeste,premium
 1457902@sga.pucminas.br,Estudante PUC,sudeste,premium
-teste@exemplo.com,Cliente Teste,nordeste,geral
-admin@empresa.com,Administrador,sul,regiao_sul
+icsbarbosa@sga.pucminas.br,Vagabundando na PUC,norte,pobre
+g2002souzajardim@gmail.com,Estudante PUC,nordeste,premium
 EOF
         log_success "Template CSV criado: $csv_file"
         log_warning "EDITE o arquivo $csv_file com os emails reais antes de continuar"

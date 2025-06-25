@@ -13,15 +13,13 @@ output "lambda_function_arn" {
   value       = aws_lambda_function.email_processor.arn
 }
 
-output "ses_email_identity_arn" {
-  description = "ARN da identidade de email SES"
-  value       = aws_ses_email_identity.sender_email.arn
+# CORRIGIDO: Agora retorna todos os ARNs dos emails verificados
+output "ses_email_identity_arns" {
+  description = "ARNs das identidades de email SES"
+  value       = [for email in aws_ses_email_identity.sender_emails : email.arn]
 }
 
-output "sender_email" {
-  description = "Email remetente configurado"
-  value       = aws_ses_email_identity.sender_email.email
-}
+# REMOVIDO: Este output já existe no main.tf - evitando duplicação
 
 output "cupons_api_url" {
   description = "URL base da API de cupons"
@@ -46,12 +44,13 @@ output "campanhas_api_endpoint" {
   value       = "POST ${aws_api_gateway_deployment.cupons_api_deployment.invoke_url}/campanhas/trigger"
 }
 
-output "sns_topics" {
-  description = "Tópicos SNS para segmentação de clientes"
+output "sqs_queues" {
+  description = "Lista de filas SQS criadas por tipo"
   value = {
-    premium     = aws_sns_topic.clientes_premium.arn
-    regiao_sul  = aws_sns_topic.clientes_regiao_sul.arn
-    geral       = aws_sns_topic.clientes_geral.arn
+    premium     = aws_sqs_queue.email_premium.url
+    regiao_sul  = aws_sqs_queue.email_regiao_sul.url
+    geral       = aws_sqs_queue.email_geral.url
+    main        = aws_sqs_queue.email_notifications.url
   }
 }
 
@@ -69,7 +68,7 @@ resource "local_file" "postman_collection" {
     aws_region      = var.aws_region
     stage          = "prod"
   })
-  
+
   depends_on = [
     aws_api_gateway_deployment.cupons_api_deployment
   ]

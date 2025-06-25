@@ -86,7 +86,10 @@ resource "aws_iam_role_policy" "lambda_policy" {
         ]
         Resource = [
           aws_sqs_queue.email_notifications.arn,
-          aws_sqs_queue.email_notifications_dlq.arn
+          aws_sqs_queue.email_notifications_dlq.arn,
+          aws_sqs_queue.email_premium.arn,
+          aws_sqs_queue.email_regiao_sul.arn,
+          aws_sqs_queue.email_geral.arn
         ]
       },
       {
@@ -118,7 +121,7 @@ resource "aws_lambda_function" "email_processor" {
 
   environment {
     variables = {
-      SENDER_EMAIL = var.sender_email
+      SENDER_EMAIL = "1457902@sga.pucminas.br"
     }
   }
 
@@ -135,7 +138,7 @@ resource "aws_lambda_function" "email_processor" {
 
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "lambda_logs" {
-  name              = "/aws/lambda/email-processor"
+  name              = "/aws/lambda/email-send"
   retention_in_days = 14
 }
 
@@ -147,9 +150,10 @@ resource "aws_lambda_event_source_mapping" "sqs_lambda_trigger" {
   maximum_batching_window_in_seconds = 5
 }
 
-# SES Email Identity (para usar sem domínio próprio)
-resource "aws_ses_email_identity" "sender_email" {
-  email = var.sender_email
+# SES Email Identities (múltiplos emails)
+resource "aws_ses_email_identity" "sender_emails" {
+  for_each = toset(var.sender_emails)
+  email    = each.value
 }
 
 # SES Configuration Set
@@ -169,4 +173,10 @@ resource "aws_ses_event_destination" "cloudwatch" {
     dimension_name = "MessageTag"
     value_source   = "messageTag"
   }
+}
+
+# Outputs para mostrar os emails verificados
+output "verified_sender_emails" {
+  description = "Lista de emails verificados no SES"
+  value       = [for email in aws_ses_email_identity.sender_emails : email.email]
 }

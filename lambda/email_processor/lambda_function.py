@@ -78,27 +78,11 @@ def process_email_message(message_data: Dict[str, Any]) -> bool:
         if not all([destinatario, assunto, conteudo]):
             logger.error("Campos obrigatórios ausentes na mensagem")
             return False
-        
-        # Lista de emails autorizados para teste
-        emails_autorizados = [
-            'arihenriquedev@hotmail.com',
-            '1457902@sga.pucminas.br'
-        ]
-        
-        # Verificar se o email está na lista autorizada
-        if destinatario not in emails_autorizados:
-            logger.warning(f"Email não autorizado para teste: {destinatario}")
-            logger.info("Emails autorizados: " + ", ".join(emails_autorizados))
-            # Retornar True para não causar falha no processamento SQS
-            # mas não enviar o email (apenas log de warning)
-            return True
-        
+
         logger.info(f"Email autorizado para envio: {destinatario}")
-        
-        # Formatar o email HTML
+
         html_content = format_email_html(assunto, conteudo)
-        
-        # Enviar via SES
+
         return send_email_via_ses(destinatario, assunto, conteudo, html_content)
         
     except Exception as e:

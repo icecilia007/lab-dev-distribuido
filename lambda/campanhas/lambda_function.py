@@ -5,6 +5,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configurar logging
 logger = logging.getLogger()
@@ -17,9 +18,9 @@ sqs_client = boto3.client('sqs')
 
 # Variáveis de ambiente
 DYNAMODB_TABLE = os.environ.get('DYNAMODB_TABLE', 'campanhas-metricas')
-SNS_TOPIC_PREMIUM = os.environ.get('SNS_TOPIC_PREMIUM')
-SNS_TOPIC_REGIAO_SUL = os.environ.get('SNS_TOPIC_REGIAO_SUL')
-SNS_TOPIC_GERAL = os.environ.get('SNS_TOPIC_GERAL')
+SQS_EMAIL_QUEUE_PREMIUM = os.environ.get('SQS_EMAIL_QUEUE_PREMIUM')
+SQS_EMAIL_QUEUE_REGIAO_SUL = os.environ.get('SQS_EMAIL_QUEUE_REGIAO_SUL')
+SQS_EMAIL_QUEUE_GERAL = os.environ.get('SQS_EMAIL_QUEUE_GERAL')
 SQS_EMAIL_QUEUE = os.environ.get('SQS_EMAIL_QUEUE')
 
 table = dynamodb.Table(DYNAMODB_TABLE)
@@ -38,12 +39,25 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if http_method == 'POST' and path == '/campanhas/trigger':
             return processar_campanha(event)
         
-        # Rota não encontrada
-        return criar_resposta(404, {'error': 'Rota não encontrada'})
+        # Log para debug de rotas não encontradas
+        logger.error(f"Rota não encontrada: {http_method} {path}")
+        logger.error(f"Evento completo: {json.dumps(event)}")
+        
+        # Retornar erro 500 para todas as situações não tratadas
+        return criar_resposta(500, {
+            'error': 'Rota não encontrada ou método não suportado',
+            'method': http_method,
+            'path': path,
+            'message': 'Verifique se está usando POST /campanhas/trigger'
+        })
         
     except Exception as e:
         logger.error(f"Erro no processamento: {str(e)}")
-        return criar_resposta(500, {'error': 'Erro interno do servidor'})
+        logger.error(f"Evento que causou erro: {json.dumps(event)}")
+        return criar_resposta(500, {
+            'error': 'Erro interno do servidor',
+            'message': str(e)
+        })
 
 def processar_campanha(event: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -80,14 +94,35 @@ def processar_campanha(event: Dict[str, Any]) -> Dict[str, Any]:
         # Registrar início da campanha
         registrar_metrica_campanha(campanha)
         
-        # Processar cada grupo de segmentação
+        # Processar todos os grupos simultaneamente
         total_emails = 0
         grupos_processados = []
         
-        for grupo in body['grupos']:
-            resultado = processar_grupo_segmentacao(campanha_id, campanha, grupo)
-            total_emails += resultado['emails_enviados']
-            grupos_processados.append(resultado)
+        # Usar ThreadPoolExecutor para processar grupos em paralelo
+        with ThreadPoolExecutor(max_workers=len(body['grupos'])) as executor:
+            # Submeter todas as tarefas
+            future_to_grupo = {
+                executor.submit(processar_grupo_segmentacao, campanha_id, campanha, grupo): grupo 
+                for grupo in body['grupos']
+            }
+            
+            # Coletar resultados conforme completam
+            for future in as_completed(future_to_grupo):
+                grupo = future_to_grupo[future]
+                try:
+                    resultado = future.result()
+                    total_emails += resultado['emails_enviados']
+                    grupos_processados.append(resultado)
+                    logger.info(f"Grupo {grupo['tipo']} processado com sucesso")
+                except Exception as exc:
+                    logger.error(f"Grupo {grupo['tipo']} gerou exceção: {exc}")
+                    # Adicionar resultado de erro para tracking
+                    grupos_processados.append({
+                        'tipo': grupo['tipo'],
+                        'clientes_alvo': len(grupo.get('clientes', [])),
+                        'emails_enviados': 0,
+                        'erro': str(exc)
+                    })
         
         # Atualizar métricas finais
         campanha_final = {
@@ -122,14 +157,14 @@ def processar_grupo_segmentacao(campanha_id: str, campanha: Dict, grupo: Dict) -
     
     logger.info(f"Processando grupo {tipo_grupo} com {len(clientes)} clientes")
     
-    # Definir tópico SNS baseado no tipo
-    topic_mapping = {
-        'premium': SNS_TOPIC_PREMIUM,
-        'regiao_sul': SNS_TOPIC_REGIAO_SUL,
-        'geral': SNS_TOPIC_GERAL
+    # Definir fila SQS baseado no tipo
+    queue_mapping = {
+        'premium': SQS_EMAIL_QUEUE_PREMIUM,
+        'regiao_sul': SQS_EMAIL_QUEUE_REGIAO_SUL,
+        'geral': SQS_EMAIL_QUEUE_GERAL
     }
     
-    topic_arn = topic_mapping.get(tipo_grupo, SNS_TOPIC_GERAL)
+    queue_url = queue_mapping.get(tipo_grupo, SQS_EMAIL_QUEUE_GERAL)
     
     emails_enviados = 0
     
@@ -150,26 +185,18 @@ def processar_grupo_segmentacao(campanha_id: str, campanha: Dict, grupo: Dict) -
                 'timestamp': datetime.now().timestamp() * 1000
             }
             
-            # Enviar diretamente para SQS (mais eficiente que SNS para este caso)
-            enviar_email_sqs(email_data)
+            # Enviar para fila SQS específica do grupo
+            enviar_email_sqs(queue_url, email_data)
             emails_enviados += 1
             
         except Exception as e:
             logger.error(f"Erro ao processar cliente {cliente.get('id', 'unknown')}: {str(e)}")
     
-    # Publicar métrica no SNS para monitoring
-    publicar_metrica_sns(topic_arn, {
-        'campanha_id': campanha_id,
-        'grupo': tipo_grupo,
-        'emails_enviados': emails_enviados,
-        'timestamp': datetime.now(timezone.utc).isoformat()
-    })
-    
     return {
         'tipo': tipo_grupo,
         'clientes_alvo': len(clientes),
         'emails_enviados': emails_enviados,
-        'topic_arn': topic_arn
+        'queue_url': queue_url
     }
 
 def personalizar_conteudo(campanha: Dict, cliente: Dict, tipo_grupo: str) -> str:
@@ -219,19 +246,19 @@ Equipe de Logística"""
     
     return conteudo_personalizado
 
-def enviar_email_sqs(email_data: Dict) -> None:
+def enviar_email_sqs(queue_url: str, email_data: Dict) -> None:
     """
-    Envia dados de email para a fila SQS
+    Envia dados de email para a fila SQS específica do grupo
     """
     try:
         message_body = json.dumps(email_data)
         
         response = sqs_client.send_message(
-            QueueUrl=SQS_EMAIL_QUEUE,
+            QueueUrl=queue_url,
             MessageBody=message_body
         )
         
-        logger.info(f"Email enviado para SQS: {email_data['destinatario']}")
+        logger.info(f"Email enviado para SQS {email_data['grupo']}: {email_data['destinatario']}")
         
     except Exception as e:
         logger.error(f"Erro ao enviar email para SQS: {str(e)}")

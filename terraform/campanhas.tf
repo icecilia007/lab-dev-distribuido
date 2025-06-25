@@ -37,30 +37,90 @@ resource "aws_dynamodb_table" "campanhas_metricas" {
   }
 }
 
-# SNS Topics para Segmentação
-resource "aws_sns_topic" "clientes_premium" {
-  name = "clientes-premium"
-  
+# SQS Queues para Segmentação de Email
+resource "aws_sqs_queue" "email_premium" {
+  name                      = "notifications-premium"
+  delay_seconds             = 0
+  max_message_size          = 262144
+  message_retention_seconds = 1209600
+  receive_wait_time_seconds = 10
+  visibility_timeout_seconds = 120
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.email_premium_dlq.arn
+    maxReceiveCount     = 3
+  })
+
   tags = {
-    Name        = "clientes-premium"
+    Name        = "notifications-premium"
     Environment = var.environment
   }
 }
 
-resource "aws_sns_topic" "clientes_regiao_sul" {
-  name = "clientes-regiao-sul"
-  
+resource "aws_sqs_queue" "email_premium_dlq" {
+  name                      = "notifications-premium-dlq"
+  message_retention_seconds = 1209600
+
   tags = {
-    Name        = "clientes-regiao-sul"
+    Name        = "notifications-premium-dlq"
     Environment = var.environment
   }
 }
 
-resource "aws_sns_topic" "clientes_geral" {
-  name = "clientes-geral"
-  
+resource "aws_sqs_queue" "email_regiao_sul" {
+  name                      = "notifications-regiao-sul"
+  delay_seconds             = 0
+  max_message_size          = 262144
+  message_retention_seconds = 1209600
+  receive_wait_time_seconds = 10
+  visibility_timeout_seconds = 120
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.email_regiao_sul_dlq.arn
+    maxReceiveCount     = 3
+  })
+
   tags = {
-    Name        = "clientes-geral"
+    Name        = "notifications-regiao-sul"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sqs_queue" "email_regiao_sul_dlq" {
+  name                      = "notifications-regiao-sul-dlq"
+  message_retention_seconds = 1209600
+
+  tags = {
+    Name        = "notifications-regiao-sul-dlq"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sqs_queue" "email_geral" {
+  name                      = "notifications-geral"
+  delay_seconds             = 0
+  max_message_size          = 262144
+  message_retention_seconds = 1209600
+  receive_wait_time_seconds = 10
+  visibility_timeout_seconds = 120
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.email_geral_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = {
+    Name        = "notifications-geral"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sqs_queue" "email_geral_dlq" {
+  name                      = "notifications-geral-dlq"
+  message_retention_seconds = 1209600
+
+  tags = {
+    Name        = "notifications-geral-dlq"
     Environment = var.environment
   }
 }
@@ -117,23 +177,13 @@ resource "aws_iam_role_policy" "campanhas_lambda_policy" {
       {
         Effect = "Allow"
         Action = [
-          "sns:Publish",
-          "sns:Subscribe",
-          "sns:CreateTopic"
-        ]
-        Resource = [
-          aws_sns_topic.clientes_premium.arn,
-          aws_sns_topic.clientes_regiao_sul.arn,
-          aws_sns_topic.clientes_geral.arn
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
           "sqs:SendMessage",
           "sqs:GetQueueAttributes"
         ]
         Resource = [
+          aws_sqs_queue.email_premium.arn,
+          aws_sqs_queue.email_regiao_sul.arn,
+          aws_sqs_queue.email_geral.arn,
           aws_sqs_queue.email_notifications.arn
         ]
       }
@@ -164,11 +214,11 @@ resource "aws_lambda_function" "campanhas_processor" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE         = aws_dynamodb_table.campanhas_metricas.name
-      SNS_TOPIC_PREMIUM      = aws_sns_topic.clientes_premium.arn
-      SNS_TOPIC_REGIAO_SUL   = aws_sns_topic.clientes_regiao_sul.arn
-      SNS_TOPIC_GERAL        = aws_sns_topic.clientes_geral.arn
-      SQS_EMAIL_QUEUE        = aws_sqs_queue.email_notifications.url
+      DYNAMODB_TABLE           = aws_dynamodb_table.campanhas_metricas.name
+      SQS_EMAIL_QUEUE_PREMIUM  = aws_sqs_queue.email_premium.url
+      SQS_EMAIL_QUEUE_REGIAO_SUL = aws_sqs_queue.email_regiao_sul.url
+      SQS_EMAIL_QUEUE_GERAL    = aws_sqs_queue.email_geral.url
+      SQS_EMAIL_QUEUE          = aws_sqs_queue.email_notifications.url
     }
   }
 
@@ -225,49 +275,24 @@ resource "aws_lambda_permission" "api_gateway_campanhas" {
   source_arn    = "${aws_api_gateway_rest_api.cupons_api.execution_arn}/*/*"
 }
 
-# SNS Subscriptions para SQS (para reprocessar emails)
-resource "aws_sns_topic_subscription" "premium_to_sqs" {
-  topic_arn = aws_sns_topic.clientes_premium.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.email_notifications.arn
+# Event Source Mappings para cada fila SQS
+resource "aws_lambda_event_source_mapping" "sqs_premium_lambda_trigger" {
+  event_source_arn = aws_sqs_queue.email_premium.arn
+  function_name    = aws_lambda_function.email_processor.arn
+  batch_size       = 10
+  maximum_batching_window_in_seconds = 5
 }
 
-resource "aws_sns_topic_subscription" "regiao_sul_to_sqs" {
-  topic_arn = aws_sns_topic.clientes_regiao_sul.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.email_notifications.arn
+resource "aws_lambda_event_source_mapping" "sqs_regiao_sul_lambda_trigger" {
+  event_source_arn = aws_sqs_queue.email_regiao_sul.arn
+  function_name    = aws_lambda_function.email_processor.arn
+  batch_size       = 10
+  maximum_batching_window_in_seconds = 5
 }
 
-resource "aws_sns_topic_subscription" "geral_to_sqs" {
-  topic_arn = aws_sns_topic.clientes_geral.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.email_notifications.arn
-}
-
-# Permissions para SNS publicar no SQS
-resource "aws_sqs_queue_policy" "email_queue_policy" {
-  queue_url = aws_sqs_queue.email_notifications.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "sns.amazonaws.com"
-        }
-        Action = "sqs:SendMessage"
-        Resource = aws_sqs_queue.email_notifications.arn
-        Condition = {
-          ArnEquals = {
-            "aws:SourceArn" = [
-              aws_sns_topic.clientes_premium.arn,
-              aws_sns_topic.clientes_regiao_sul.arn,
-              aws_sns_topic.clientes_geral.arn
-            ]
-          }
-        }
-      }
-    ]
-  })
+resource "aws_lambda_event_source_mapping" "sqs_geral_lambda_trigger" {
+  event_source_arn = aws_sqs_queue.email_geral.arn
+  function_name    = aws_lambda_function.email_processor.arn
+  batch_size       = 10
+  maximum_batching_window_in_seconds = 5
 }
