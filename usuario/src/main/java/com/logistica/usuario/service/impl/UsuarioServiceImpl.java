@@ -25,7 +25,6 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final MotoristaRepository motoristaRepository;
     private final OperadorRepository operadorRepository;
 
-    // Injeção de dependências via construtor
     public UsuarioServiceImpl(UsuarioRepository usuarioRepository,
                           ClienteRepository clienteRepository,
                           MotoristaRepository motoristaRepository,
@@ -62,6 +61,13 @@ public class UsuarioServiceImpl implements UsuarioService {
         return converterParaUsuarioResponse(clienteSalvo);
     }
 
+    public Cliente atualizarCategoriaCliente(Long id, String categoria) {
+        Cliente cliente = clienteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
+
+        cliente.setCategoria(categoria);
+        return clienteRepository.save(cliente);
+    }
 
     public Cliente atualizarCliente(Long id, Cliente clienteDetalhes) {
         Cliente cliente = clienteRepository.findById(id)

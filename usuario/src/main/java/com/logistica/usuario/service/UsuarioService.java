@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface UsuarioService {
     UsuarioResponse criarCliente(Cliente cliente);
+    Cliente atualizarCategoriaCliente(Long id, String categoria);
 
     List<Cliente> buscarTodosClientes();
 

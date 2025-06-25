@@ -61,6 +61,16 @@ public class UsuarioController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/clientes/{id}/categoria/{categoria}")
+    public ResponseEntity<Cliente> atualizarCategoriaCliente(
+            @PathVariable Long id,
+            @PathVariable String categoria) {
+
+        Cliente clienteAtualizado = usuarioService.atualizarCategoriaCliente(id, categoria);
+        return ResponseEntity.ok(clienteAtualizado);
+    }
+
+
     // Endpoints para Motoristas
     @PostMapping("/motoristas")
     public ResponseEntity<UsuarioResponse> criarMotorista(@RequestBody Motorista motorista) {
