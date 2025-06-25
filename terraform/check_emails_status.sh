@@ -25,6 +25,8 @@ fi
 EMAILS=(
     "arihenriquedev@hotmail.com"
     "1457902@sga.pucminas.br"
+    "icsbarbosa@sga.pucminas.br"
+    "g2002souzajardim@gmail.com"
 )
 
 # Se existe CSV, extrair emails dele

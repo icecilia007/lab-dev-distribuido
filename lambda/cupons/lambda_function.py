@@ -34,7 +34,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return listar_cupons_disponiveis(query_parameters)
             elif path.startswith('/cupons/') and 'id' in path_parameters:
                 cupom_id = path_parameters['id']
-                return buscar_cupom_por_id(cupom_id)
+                # Verificar se é para usar o cupom ou apenas visualizar
+                usar_cupom = query_parameters.get('usar', 'true').lower() == 'true'
+                if usar_cupom:
+                    return usar_cupom_por_id(cupom_id)
+                else:
+                    return visualizar_cupom_por_id(cupom_id)
         
         # Rota não encontrada
         return criar_resposta(404, {'error': 'Rota não encontrada'})
@@ -88,12 +93,76 @@ def listar_cupons_disponiveis(query_parameters: Dict[str, str]) -> Dict[str, Any
         logger.error(f"Erro ao listar cupons: {str(e)}")
         return criar_resposta(500, {'error': 'Erro ao buscar cupons'})
 
-def buscar_cupom_por_id(cupom_id: str) -> Dict[str, Any]:
+def usar_cupom_por_id(cupom_id: str) -> Dict[str, Any]:
     """
-    Busca um cupom específico por ID
+    Busca um cupom específico por ID e registra seu uso
     """
     try:
-        logger.info(f"Buscando cupom: {cupom_id}")
+        logger.info(f"Buscando e usando cupom: {cupom_id}")
+        
+        # Primeiro, verificar se o cupom existe e está disponível
+        response = table.get_item(
+            Key={'cupom_id': cupom_id}
+        )
+        
+        if 'Item' not in response:
+            logger.warning(f"Cupom não encontrado: {cupom_id}")
+            return criar_resposta(404, {'error': 'Cupom não encontrado'})
+        
+        item = response['Item']
+        
+        # Verificar se o cupom está disponível
+        if item['status'] != 'disponivel':
+            logger.warning(f"Cupom não disponível: {cupom_id} - Status: {item['status']}")
+            return criar_resposta(400, {'error': 'Cupom não está disponível'})
+        
+        # Verificar se ainda tem usos disponíveis
+        uso_atual = int(item.get('uso_atual', 0))
+        uso_maximo = int(item.get('uso_maximo', 0))
+        
+        if uso_atual >= uso_maximo:
+            logger.warning(f"Cupom esgotado: {cupom_id} - Usos: {uso_atual}/{uso_maximo}")
+            return criar_resposta(400, {'error': 'Cupom esgotado'})
+        
+        # Incrementar o uso do cupom usando atomic counter
+        novo_uso = uso_atual + 1
+        novo_status = 'esgotado' if novo_uso >= uso_maximo else 'disponivel'
+        
+        # Atualizar o cupom no DynamoDB
+        update_response = table.update_item(
+            Key={'cupom_id': cupom_id},
+            UpdateExpression='SET uso_atual = :novo_uso, #status = :novo_status',
+            ExpressionAttributeNames={
+                '#status': 'status'
+            },
+            ExpressionAttributeValues={
+                ':novo_uso': novo_uso,
+                ':novo_status': novo_status
+            },
+            ReturnValues='UPDATED_NEW'
+        )
+        
+        # Formatar cupom para retorno simplificado
+        cupom_formatado = {
+            'codigo': item['cupom_id'],
+            'desconto': float(item['valor']) / 100.0 if item['tipo'] == 'percentual' else 0.0,
+            'usos_restantes': uso_maximo - novo_uso,
+            'status': novo_status
+        }
+        
+        logger.info(f"Cupom usado com sucesso: {cupom_id} - Uso: {novo_uso}/{uso_maximo}")
+        return criar_resposta(200, cupom_formatado)
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar cupom {cupom_id}: {str(e)}")
+        return criar_resposta(500, {'error': 'Erro ao buscar cupom'})
+
+def visualizar_cupom_por_id(cupom_id: str) -> Dict[str, Any]:
+    """
+    Visualiza um cupom específico por ID sem registrar uso
+    """
+    try:
+        logger.info(f"Visualizando cupom: {cupom_id}")
         
         # Buscar item na tabela
         response = table.get_item(
@@ -106,17 +175,22 @@ def buscar_cupom_por_id(cupom_id: str) -> Dict[str, Any]:
         
         # Formatar cupom para retorno simplificado
         item = response['Item']
+        uso_atual = int(item.get('uso_atual', 0))
+        uso_maximo = int(item.get('uso_maximo', 0))
+        
         cupom_formatado = {
             'codigo': item['cupom_id'],
-            'desconto': float(item['valor']) / 100.0 if item['tipo'] == 'percentual' else 0.0
+            'desconto': float(item['valor']) / 100.0 if item['tipo'] == 'percentual' else 0.0,
+            'usos_restantes': uso_maximo - uso_atual,
+            'status': item['status']
         }
         
-        logger.info(f"Cupom encontrado: {cupom_id}")
+        logger.info(f"Cupom visualizado: {cupom_id}")
         return criar_resposta(200, cupom_formatado)
         
     except Exception as e:
-        logger.error(f"Erro ao buscar cupom {cupom_id}: {str(e)}")
-        return criar_resposta(500, {'error': 'Erro ao buscar cupom'})
+        logger.error(f"Erro ao visualizar cupom {cupom_id}: {str(e)}")
+        return criar_resposta(500, {'error': 'Erro ao visualizar cupom'})
 
 def converter_decimal_to_float(obj):
     """
