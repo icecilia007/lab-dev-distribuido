@@ -3,7 +3,9 @@ package com.logistica.notificacao.message;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.logistica.notificacao.exception.ServicoExternoException;
 import com.logistica.notificacao.model.Notificacao;
+import com.logistica.notificacao.service.EmailService;
 import com.logistica.notificacao.service.NotificacaoService;
+import com.logistica.notificacao.service.UsuarioServiceClient;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +25,13 @@ public class EventoConsumer {
     private static final Logger logger = LoggerFactory.getLogger(EventoConsumer.class);
 
     private final NotificacaoService notificacaoService;
+    private final EmailService emailService;
+    private final UsuarioServiceClient usuarioServiceClient;
 
-    public EventoConsumer(NotificacaoService notificacaoService) {
+    public EventoConsumer(NotificacaoService notificacaoService, EmailService emailService, UsuarioServiceClient usuarioServiceClient) {
         this.notificacaoService = notificacaoService;
+        this.emailService = emailService;
+        this.usuarioServiceClient = usuarioServiceClient;
     }
 
     @RabbitListener(queues = "notificacoes.geral", containerFactory = "rabbitListenerContainerFactory")
@@ -105,6 +111,7 @@ public class EventoConsumer {
 
     private void criarNotificacao(Long destinatarioId, String tipoEvento, String origem, Map<String, Object> dados, Map<String, Object> mensagemCompleta) {
         logger.info("Criando notificacao para destinatário: {}, evento: {}", destinatarioId, tipoEvento);
+        logger.info("Dados do evento: {}", dados);
         try {
             Notificacao notificacao = new Notificacao();
             notificacao.setDestinatarioId(destinatarioId);
@@ -118,9 +125,11 @@ public class EventoConsumer {
                 logger.warn("Erro ao serializar dados do evento: {}", e.getMessage());
             }
 
+            logger.info("Chamando gerarConteudoNotificacao para tipo: {}", tipoEvento);
             Map<String, String> conteudo = gerarConteudoNotificacao(tipoEvento, dados);
             notificacao.setTitulo(conteudo.get("titulo"));
             notificacao.setMensagem(conteudo.get("mensagem"));
+            logger.info("Conteudo gerado - titulo: {}, mensagem: {}", conteudo.get("titulo"), conteudo.get("mensagem"));
 
             notificacaoService.salvar(notificacao);
         } catch (Exception e) {
@@ -140,6 +149,15 @@ public class EventoConsumer {
                 String status = dados.containsKey("novoStatus") ? dados.get("novoStatus").toString() : "atualizado";
                 conteudo.put("titulo", "Status atualizado");
                 conteudo.put("mensagem", "Seu pedido agora está " + status);
+                
+                // Se o status for ENTREGUE, enviar email
+                logger.info("Status verificado: {} - Verificando se deve enviar email", status);
+                if ("ENTREGUE".equals(status)) {
+                    logger.info("Status é ENTREGUE, enviando email de entrega");
+                    enviarEmailEntrega(dados);
+                } else {
+                    logger.info("Status não é ENTREGUE, não enviando email");
+                }
                 break;
             case "PEDIDO_CANCELADO":
                 String motivo = dados.containsKey("motivo") ? dados.get("motivo").toString() : "";
@@ -168,5 +186,38 @@ public class EventoConsumer {
         }
 
         return conteudo;
+    }
+
+    private void enviarEmailEntrega(Map<String, Object> dados) {
+        try {
+            // Buscar informações do cliente
+            Long clienteId = convertToLong(dados.get("clienteId"));
+            if (clienteId != null) {
+                Map<String, Object> cliente = usuarioServiceClient.buscarUsuarioPorTipoEId("clientes", clienteId);
+                if (cliente != null && cliente.containsKey("email")) {
+                    String emailCliente = (String) cliente.get("email");
+                    Long pedidoId = convertToLong(dados.get("pedidoId"));
+                    
+                    String assunto = "Pedido Entregue - ID #" + pedidoId;
+                    String conteudo = String.format(
+                        "Olá!\n\nSeu pedido #%d foi entregue com sucesso!\n\n" +
+                        "Detalhes:\n" +
+                        "- ID do Pedido: %d\n" +
+                        "- Status: ENTREGUE\n" +
+                        "- Data de entrega: %s\n\n" +
+                        "Obrigado por utilizar nossos serviços!\n\n" +
+                        "Equipe de Logística",
+                        pedidoId, pedidoId, java.time.LocalDateTime.now().toString()
+                    );
+                    
+                    emailService.enviarEmail(emailCliente, assunto, conteudo);
+                    logger.info("Email de entrega enviado para cliente ID: {}, email: {}", clienteId, emailCliente);
+                } else {
+                    logger.warn("Email não encontrado para cliente ID: {}", clienteId);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Erro ao enviar email de entrega: {}", e.getMessage(), e);
+        }
     }
 }

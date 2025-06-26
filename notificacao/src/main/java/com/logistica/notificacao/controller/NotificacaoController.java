@@ -2,6 +2,7 @@ package com.logistica.notificacao.controller;
 
 import com.logistica.notificacao.exception.OperacaoInvalidaException;
 import com.logistica.notificacao.model.Notificacao;
+import com.logistica.notificacao.service.EmailService;
 import com.logistica.notificacao.service.NotificacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,9 +18,11 @@ import java.util.Map;
 public class NotificacaoController {
 
     private final NotificacaoService notificacaoService;
+    private final EmailService emailService;
 
-    public NotificacaoController(NotificacaoService notificacaoService) {
+    public NotificacaoController(NotificacaoService notificacaoService, EmailService emailService) {
         this.notificacaoService = notificacaoService;
+        this.emailService = emailService;
     }
 
     @Operation(summary = "Buscar notificações por destinatário")
@@ -65,5 +68,21 @@ public class NotificacaoController {
         }
         notificacaoService.marcarComoLida(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Testar envio de email para SQS")
+    @PostMapping("/test-email")
+    public ResponseEntity<Map<String, String>> testarEmail(
+            @RequestParam String email,
+            @RequestParam(defaultValue = "Teste SQS") String assunto,
+            @RequestParam(defaultValue = "Teste de envio para fila SQS") String conteudo) {
+        
+        emailService.enviarEmail(email, assunto, conteudo);
+        
+        return ResponseEntity.ok(Map.of(
+                "message", "Email enviado para fila SQS",
+                "destinatario", email,
+                "assunto", assunto
+        ));
     }
 }

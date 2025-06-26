@@ -135,6 +135,10 @@ services:
       - SPRING_RABBITMQ_PASSWORD=guest
       - NOTIFICATION_MODE=${NOTIFICATION_MODE:-JAVA}
       - USUARIO_SERVICE_URL=http://usuario-service:8080
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_SQS_EMAIL_QUEUE_URL=${AWS_SQS_EMAIL_QUEUE_URL:-https://sqs.us-east-1.amazonaws.com/176343551411/email-notifications}
+    volumes:
+      - ~/.aws:/root/.aws:ro
     depends_on:
       postgres:
         condition: service_healthy

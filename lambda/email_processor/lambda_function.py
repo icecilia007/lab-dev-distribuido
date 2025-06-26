@@ -5,11 +5,10 @@ import os
 from typing import Dict, Any
 from datetime import datetime
 
-# Configurar logging
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Inicializar clientes AWS
 ses_client = boto3.client('ses')
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -23,20 +22,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     for record in event['Records']:
         try:
-            # Parse da mensagem SQS com tratamento de escape
             body = record['body']
             logger.info(f"Mensagem recebida: {body}")
-            
-            # Tentar parse direto primeiro
+
             try:
                 message_body = json.loads(body)
             except json.JSONDecodeError as e:
                 logger.warning(f"Erro no primeiro parse: {str(e)}")
-                # Tentar remover escapes problemáticos
                 cleaned_body = body.replace('\\', '')
                 message_body = json.loads(cleaned_body)
-            
-            # Processar o email
+
             success = process_email_message(message_body)
             
             if success:
@@ -49,8 +44,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         except Exception as e:
             failed_count += 1
             logger.error(f"Erro ao processar registro: {str(e)}")
-            # Não re-raise a exceção para evitar que mensagens vão para DLQ
-            # Log de erro é suficiente para debugging
     
     return {
         'statusCode': 200,
@@ -66,10 +59,9 @@ def process_email_message(message_data: Dict[str, Any]) -> bool:
     Processa uma mensagem individual de email
     """
     try:
-        # Filtrar mensagens SNS de métricas (não são emails para envio)
         if message_data.get('Type') == 'Notification':
             logger.info("Mensagem de métrica SNS ignorada - não é email para envio")
-            return True  # Não é erro, apenas não é email
+            return True
             
         destinatario = message_data.get('destinatario')
         assunto = message_data.get('assunto')
@@ -93,10 +85,8 @@ def format_email_html(assunto: str, conteudo: str) -> str:
     """
     Formata o conteúdo do email em HTML limpo e anti-spam
     """
-    # Limpar o conteúdo removendo quebras de linha extras e espaços
     conteudo_limpo = conteudo.strip()
-    
-    # Converter quebras de linha para HTML de forma mais limpa
+
     conteudo_html = conteudo_limpo.replace('\n', '<br>\n')
     
     html_template = f"""<!DOCTYPE html>
@@ -186,14 +176,12 @@ def send_email_via_ses(destinatario: str, assunto: str, conteudo_texto: str, con
     Envia email usando Amazon SES com headers anti-spam
     """
     try:
-        # Usar a variável de ambiente para o email remetente
         sender_email = os.environ.get('SENDER_EMAIL')
-        
-        # Limpar e formatar o conteúdo texto para melhor legibilidade
+
         conteudo_texto_limpo = conteudo_texto.replace('\n\n', '\n').strip()
         
         response = ses_client.send_email(
-            Source=f"Sistema de Logística <{sender_email}>",  # Nome + email remetente
+            Source=f"Sistema de Logística <{sender_email}>",
             Destination={
                 'ToAddresses': [destinatario]
             },

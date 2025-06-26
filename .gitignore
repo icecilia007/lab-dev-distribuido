@@ -80,3 +80,10 @@ poetry.lock
 *.terraform
 .terraform/
 **/.terraform/*
+
+
+curl -X PATCH "http://localhost:8081/api/pedidos/1/status" \
+    -H "Content-Type: application/json" \
+    -H "X-Internal-Auth: 2BE2AB6217329B86A427A3819B626" \
+    -d '{"novoStatus": "ENTREGUE"}' \
+    -s

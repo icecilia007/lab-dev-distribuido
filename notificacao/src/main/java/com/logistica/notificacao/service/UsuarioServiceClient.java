@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class UsuarioServiceClient {
@@ -40,6 +41,20 @@ public class UsuarioServiceClient {
                 HttpMethod.GET,
                 entity,
                 new ParameterizedTypeReference<List<ClienteResponse>>() {}
+        ).getBody();
+    }
+
+    public Map<String, Object> buscarUsuarioPorTipoEId(String tipo, Long id) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(secretHeaderName, secretHeaderValue);
+        headers.set("Content-Type", "application/json");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        return restTemplate.exchange(
+                usuarioServiceUrl + "/api/usuarios/" + tipo + "/" + id,
+                HttpMethod.GET,
+                entity,
+                new ParameterizedTypeReference<Map<String, Object>>() {}
         ).getBody();
     }
 }
